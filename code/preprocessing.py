@@ -2,7 +2,7 @@ import numpy as np
 from scipy.signal import butter, iirnotch, filtfilt
 
 class EMGPreprocessing:
-    def __init__(self, fs=200, notch_freq=60.0, low_cut=5.0, high_cut=99.0, quality_factor=30.0, order=4):
+    def __init__(self, fs=250, notch_freq=60.0, low_cut=10.0, high_cut=120.0, quality_factor=30.0, order=4):
         self.fs = fs
         self.notch_freq = notch_freq
         self.low_cut = low_cut
@@ -40,3 +40,12 @@ class EMGPreprocessing:
         high = self.high_cut / nyquist
         b, a = butter(self.order, [low, high], btype='band')
         return filtfilt(b, a, data, axis=1)
+    
+    
+def highpass_filter(self, data):
+
+    nyquist = 0.5 * self.fs
+    normalized_cutoff = self.low_cut / nyquist
+    b, a = butter(self.order, normalized_cutoff, btype='high')
+    
+    return filtfilt(b, a, data, axis=1)

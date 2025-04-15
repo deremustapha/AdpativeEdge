@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import math
 from torchvision.models import mobilenet_v3_small
 # import convolution
-# from mcunet.mcunet.model_zoo import net_id_list, build_model, download_tflite
+from mcunet.mcunet.model_zoo import net_id_list, build_model, download_tflite
 
 class EMGNet(nn.Module):
     def __init__(self, num_gesture):
@@ -37,6 +37,39 @@ class EMGNet(nn.Module):
         x = self.fc2(x)
         return x
 
+
+class EMGNas(nn.Module):
+    def __init__(self, num_gesture):
+        super(EMGNas, self).__init__()
+
+        self.num_gesture = num_gesture
+
+        self.conv1 = nn.Conv2d(1, 6, kernel_size=3, stride=1, padding=1)
+        self.relu1 = nn.ReLU()
+        self.maxpool1 = nn.MaxPool2d(kernel_size=(2, 2))
+        self.conv2 = nn.Conv2d(6, 9, kernel_size=3, stride=1, padding=1)
+        self.relu2 = nn.ReLU()
+        self.maxpool2 = nn.MaxPool2d(kernel_size=(2, 2))
+        self.globalpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.flatten = nn.Flatten()
+        self.fc1 = nn.Linear(9, 13) #1280,40
+        self.relu3 = nn.ReLU()
+        self.fc2 = nn.Linear(13, self.num_gesture)
+    
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.relu1(x)
+        x = self.maxpool1(x)
+        x = self.conv2(x)
+        x = self.relu2(x)
+        x = self.maxpool2(x)
+        x = self.globalpool(x)
+        x = self.flatten(x)
+        x = self.fc1(x)
+        x = self.relu3(x)
+        x = self.fc2(x)
+        return x
+    
 
 
 class FANLayer(nn.Module):
@@ -218,11 +251,6 @@ class EMGFANNew(nn.Module):
         x = self.maxpool2(x)
         x = self.dropout(x)
 
-
-        # x = self.conv3(x)
-        # x = self.bn(x)
-        # x = self.act(x)
-
         x = self.flatten(x)
 
         x = self.FAN(x)
@@ -231,9 +259,6 @@ class EMGFANNew(nn.Module):
 
         x = self.last(x)
         return x
-
-
-
 
 
 def MobileNetV3Small(number_gestures):
@@ -252,7 +277,13 @@ def ProxylessNAS(number_gestures):
 
     return model
 
+def MCUNet(input_channel, number_gestures):
 
+    mcunet, _, _ = build_model(net_id="mcunet-in3", pretrained=True)
+    mcunet.first_conv.conv = torch.nn.Conv2d(input_channel, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+    mcunet.classifier = torch.nn.Linear(160, number_gestures)
+
+    return mcunet
 
 class CTRLEMGNet(nn.Module):
     def __init__(self, num_gesture):
@@ -349,12 +380,3 @@ class EMGNet(nn.Module):
 # input_tensor = torch.randn(32, 128)  # Batch size of 32, input dimension of 128
 # output = model(input_tensor)
 
-
-
-# def MCUNet():
-
-#     mcunet, _, _ = build_model(net_id="mcunet-in3", pretrained=True)
-#     mcunet.first_conv.conv = torch.nn.Conv2d(1, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-#     mcunet.classifier = torch.nn.Linear(160, 10)
-
-#     return mcunet
