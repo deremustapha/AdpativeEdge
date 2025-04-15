@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import math
 from torchvision.models import mobilenet_v3_small
 # import convolution
-from mcunet.mcunet.model_zoo import net_id_list, build_model, download_tflite
+from mcunet.mcunet.model_zoo import build_model
 
 class EMGNet(nn.Module):
     def __init__(self, num_gesture):
