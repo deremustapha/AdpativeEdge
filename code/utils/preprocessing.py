@@ -42,10 +42,10 @@ class EMGPreprocessing:
         return filtfilt(b, a, data, axis=1)
     
     
-def highpass_filter(self, data):
+    def highpass_filter(self, data):
 
-    nyquist = 0.5 * self.fs
-    normalized_cutoff = self.low_cut / nyquist
-    b, a = butter(self.order, normalized_cutoff, btype='high')
-    
-    return filtfilt(b, a, data, axis=1)
+        nyquist = 0.5 * self.fs
+        normalized_cutoff = self.low_cut / nyquist
+        b, a = butter(self.order, normalized_cutoff, btype='high')
+        
+        return filtfilt(b, a, data, axis=1)
