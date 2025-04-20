@@ -119,6 +119,65 @@ def data_split(data: np.ndarray, label: np.ndarray, train_percent: float = 80) -
     return data[:train_size], label[:train_size], data[train_size:], label[train_size:]
 
 
+def get_max_label(label: np.ndarray) -> int:
+    return np.argmax(np.bincount(label))
+
+def window_with_overlap(data: np.ndarray, label: np.ndarray, window_time: int = 200,
+                        overlap: int = 60, no_channel: int = 8, fs: int=200) -> Tuple[np.ndarray, np.ndarray]:
+    samples = int(fs * (window_time / 1000))
+    num_overlap_samples = int(samples * (overlap / 100))
+    step_size = samples - num_overlap_samples
+    num_windows = (data.shape[1] - samples) // step_size + 1
+
+    data_matrix = np.array([data[:no_channel, i*step_size:i*step_size+samples] for i in range(num_windows)])
+    label_vectors = np.array([get_max_label(label[i*step_size:i*step_size+samples]) for i in range(num_windows)])
+
+    return data_matrix, label_vectors.reshape(-1)
+
+def vec_to_matrix(vector_data, no_channel=8):
+    matrix_shape = int(len(vector_data) / no_channel)
+    # print(matrix_shape)
+    matrix = np.array(vector_data).reshape(matrix_shape, no_channel)
+    return matrix
+
+
+def read_cote_data(path, subject, T_gestures=7, Truncate=992, male=True):
+    buffer_X = []
+    buffer_Y = []
+
+    for i in range(T_gestures * 4):
+        if male:
+            data_read_from_file = data_read_from_file = np.fromfile(f'{path}/Male{subject}/training0/classe_{i}.dat', dtype=np.int16)
+        else:
+            data_read_from_file = np.fromfile(f'{path}/Male{subject}/training0/classe_{i}.dat', dtype=np.int16)
+        data_read_from_file = data_read_from_file.astype(np.float32)
+        dataset_example = vec_to_matrix(data_read_from_file)[:Truncate]
+
+        label = np.full(dataset_example.shape[0], i % T_gestures, dtype=np.float32)
+
+        buffer_X.append(dataset_example)
+        buffer_Y.append(label)
+
+    buffer_X = np.concatenate(buffer_X, axis=0).T
+    buffer_Y = np.concatenate(buffer_Y, axis=0)
+    return buffer_X, buffer_Y
+
+
+def load_all_cote_participant(path, T_participant, T_gestures, male):
+    X = []
+    y = []
+    for i in range(1, T_participant + 1):
+        X_, y_ = read_cote_data(path=path, subject=i, T_gestures=T_gestures, Truncate=992, male=True)
+        # print(f'Participant {i} loaded')
+        # print(f'X shape: {X_.shape}')
+        # print(f'y shape: {y_.shape}')
+        
+        X.append(X_)
+        y.append(y_)
+
+    X_all = np.concatenate(X, axis=1)
+    y_all = np.concatenate(y, axis=0)
+    return X_all, y_all
 
 class EMGDataset(Dataset):
     """

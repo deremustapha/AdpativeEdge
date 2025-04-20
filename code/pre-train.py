@@ -7,11 +7,15 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from sklearn.metrics import f1_score, recall_score, precision_score, top_k_accuracy_score
+
+
+from sklearn.metrics import (f1_score, recall_score, 
+                             precision_score, top_k_accuracy_score)
 
 from utils.data_preparation import *
 from utils.preprocessing import *
 from models.model import *
+from models.mcunet.mcunet.model_zoo import build_model
 from utils.optimizers import *
 from utils.tools import *
 from utils.features import *
@@ -147,13 +151,24 @@ def prepare_data(path, session, subject, num_repetitions, training_type, num_ges
     else:
         raise ValueError("Invalid training type. Choose 'TSTS' or 'LRO'.")
 
-    subject_path, train_gesture, test_gesture = emg_prep.get_per_subject_file(
-        subject_number=subject, num_gesture=num_gesture, session=session, activate_session=activate_session,
-        train_repetition=train_repetition, test_repetition=test_repetition
-    )
-    train_data, test_data = emg_prep.load_data_per_subject(
-        subject_path, selected_gesture=selected_gesture, train_gesture=train_gesture, test_gesture=test_gesture
-    )
+    if training_type == "tsts":
+        subject_path, train_gesture, test_gesture = emg_prep.get_per_subject_file(
+            subject_number=subject, num_gesture=num_gesture, session=session, activate_session=activate_session,
+            train_repetition=train_repetition, test_repetition=test_repetition
+        )
+        train_data, test_data = emg_prep.load_data_per_subject(
+            subject_path, selected_gesture=selected_gesture, train_gesture=train_gesture, test_gesture=test_gesture
+        )
+    elif training_type == "lro":
+        subject_path, train_gesture, test_gesture = emg_prep.get_per_subject_file(
+            subject_number=subject, num_gesture=num_gesture, session=session, activate_session=activate_session,
+            train_repetition=train_repetition, test_repetition=test_repetition
+        )
+        train_data, test_data = emg_prep.load_data_per_subject(
+            subject_path, selected_gesture=selected_gesture, train_gesture=train_gesture, test_gesture=test_gesture
+        )
+    else:
+        raise ValueError("Invalid training type. Choose 'TSTS' or 'LRO'.")
     train_data, train_labels = emg_prep.get_data_labels(train_data)
     test_data, test_labels = emg_prep.get_data_labels(test_data)
 
@@ -174,6 +189,42 @@ def prepare_data(path, session, subject, num_repetitions, training_type, num_ges
     X_test, y_test = shuffle_data(window_test_data, window_test_labels)
 
     return X_train, y_train, X_test, y_test
+
+
+def prepare_pre_train_data(path):
+
+    total_male = 28
+    total_female = 12
+    number_gestures = 7
+    window_time = 200
+    overlap_percent = 70
+    no_channels = 8
+
+    fs = 200
+    notch_freq = 60.0
+    low_cut = 10.0
+    high_cut = 99.0 
+    order=5
+    train_ratio = 80 
+    batch_size = 32
+
+    X_male, y_male = load_all_cote_participant(path=path, T_participant=total_male, male=True, T_gestures=number_gestures)
+    X_female, y_female = load_all_cote_participant(path=path, T_participant=total_female, male=False, T_gestures=number_gestures)
+
+
+    X = np.concatenate((X_male, X_female), axis=1)
+    y = np.concatenate((y_male, y_female), axis=0)
+
+    y = y.astype(int)
+    preprocess = EMGPreprocessing(fs=fs, notch_freq=notch_freq, low_cut=low_cut, high_cut=high_cut, order=order)
+    X = preprocess.remove_mains(X)
+    X = preprocess.highpass_filter(X)
+
+    data, target  = window_with_overlap(data=X, label=y, window_time=window_time, overlap=overlap_percent, no_channel=no_channels, fs=fs)
+    data, label = shuffle_data(data=data, labels=target)
+    X_train, y_train, X_test, y_test = data_split(data=data, label=label, train_percent=train_ratio)
+    return X_train, y_train, X_test, y_test
+
 
 
 def process_input_data(input_type, X_train, X_test):
@@ -220,7 +271,14 @@ def initialize_model(model_type, in_channel, num_gesture, device):
     elif model_type == "EMGNas":
         return EMGNas(in_channel, num_gesture).to(device)
     elif model_type == "MCUNet":
+        def MCUNet(input_channel, number_gestures):
+            mcunet, _, _ = build_model(net_id="mcunet-in3", pretrained=True)
+            mcunet.first_conv.conv = torch.nn.Conv2d(input_channel, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+            mcunet.classifier = torch.nn.Linear(160, number_gestures)
+            return mcunet
         return MCUNet(in_channel, num_gesture).to(device)
+    elif model_type == "ProxyLessNas":
+        return ProxyLessNas(in_channel, num_gesture).to(device)
     else:
         raise ValueError("Invalid model type. Choose 'EMGNet', 'EMGNas', or 'MCUNet'.")
 
@@ -259,10 +317,13 @@ def run_pretrain(path, session, subject, num_repetitions, input_type, training_t
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Data preparation
-    X_train, y_train, X_test, y_test = prepare_data(
-        path, session, subject, num_repetitions, training_type, num_gesture, selected_gesture,
-        record_time, fs, notch_freq, low_cut, high_cut, order, window_time, overlap, no_channel, activate_session
-    )
+    # X_train, y_train, X_test, y_test = prepare_data(
+    #     path, session, subject, num_repetitions, training_type, num_gesture, selected_gesture,
+    #     record_time, fs, notch_freq, low_cut, high_cut, order, window_time, overlap, no_channel, activate_session
+    # )
+
+    X_train, y_train, X_test, y_test = prepare_pre_train_data(path)
+    # Data preprocessing
     X_train, X_test = process_input_data(input_type, X_train, X_test)
 
     # Create datasets and dataloaders
@@ -325,14 +386,14 @@ if __name__ == "__main__":
     main()
 
 # python3 pre-train.py \
-#     --path '/mnt/d/AI-Workspace/sEMGClassification/AdaptiveModel/data/6_Flex_BMIS/flex_bmis/mat_data' \
+#     --path '/mnt/d/AI-Workspace/sEMGClassification/AdaptiveModel/data/1_MyoArmbandDataset/PreTrain' \
 #     --input_type raw \
-#     --training_type TSTS \
+#     --training_type tsts \
 #     --session 1 \
 #     --subject 1 \
 #     --num_repetitions 9 \
 #     --num_gesture 7 \
 #     --model_type EMGNet \
 #     --epochs 50 \
-#     --save_path '/mnt/d/AI-Workspace/sEMGClassification/EdgeLastTrain/model_weights' \
+#     --save_path '/mnt/d/AI-Workspace/sEMGClassification/EdgeLastTrain/model_weights/PreTrain' \
 #     --seed 42
