@@ -235,7 +235,7 @@ def prepare_data(path, session, subject, stop_subject, num_repetitions, training
             train_repetition=train_repetition, test_repetition=test_repetition
         )
         train_data, test_data = emg_prep.load_data_per_subject(
-            start_s, selected_gesture=selected_gesture, train_gesture=train_gesture, test_gesture=test_gesture
+            subject, selected_gesture=selected_gesture, train_gesture=train_gesture, test_gesture=test_gesture
         )
     else:
         raise ValueError("Invalid training type. Choose 'TSTS' or 'LRO'.")
@@ -421,7 +421,8 @@ def run_meta_learning(path, session, start_subject, stop_subject,
     os.makedirs(save_path, exist_ok=True)
     save_dir = os.path.join(
         save_path,
-        f"MetaLearn_{model_type}_Session_{session}_Subject_{start_subject}_Input_{input_type}_Train_type_{training_type}.pth"
+        #f"MetaLearn_{model_type}_Session_{session}_Subject_{start_subject}_Input_{input_type}_Train_type_{training_type}.pth"
+        f"MetaLearn_{model_type}_Input_{input_type}_Train_Type_{training_type}.pth"
     )
 
     torch.save(model.state_dict(), save_dir)

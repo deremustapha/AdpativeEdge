@@ -1,3 +1,12 @@
+from utils.data_preparation import *
+from utils.preprocessing import *
+from models.model import *
+from models.mcunet.mcunet.model_zoo import build_model
+from utils.optimizers import *
+from utils.tools import *
+from utils.features import *
+
+
 import argparse
 import os
 import random
@@ -8,17 +17,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-
 from sklearn.metrics import (f1_score, recall_score, 
                              precision_score, top_k_accuracy_score)
-
-from utils.data_preparation import *
-from utils.preprocessing import *
-from models.model import *
-from models.mcunet.mcunet.model_zoo import build_model
-from utils.optimizers import *
-from utils.tools import *
-from utils.features import *
 
 
 def set_random_seed(seed=42):
@@ -33,82 +33,59 @@ def set_random_seed(seed=42):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
 
-def train_knowledge_distillation(teacher, student, train_loader, epochs, learning_rate, T, soft_target_loss_weight, ce_loss_weight, device):
-    ce_loss = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(student.parameters(), lr=learning_rate)
 
-    teacher.eval()  # Teacher set to evaluation mode
-    student.train() # Student to train mode
 
-    for epoch in tqdm(range(epochs)):
-        running_loss = 0.0
-        for inputs, labels in train_loader:
-            inputs, labels = inputs.float().to(device), labels.long().to(device)
+def fine_tune_loop(model, train_device, data, loss_fn, optimizer):
+
+    model.train()
+    train_loss = 0
+    correct = 0
+    total = 0
+
+
+    for X, y in data:
+
 
             optimizer.zero_grad()
 
-            # Forward pass with the teacher model - do not save gradients here as we do not change the teacher's weights
-            with torch.no_grad():
-                teacher_logits = teacher(inputs)
+            X = X.float().to(train_device)
+            y = y.long().to(train_device)
+            model = model.to(train_device)
 
-            # Forward pass with the student model
-            student_logits = student(inputs)
-
-            #Soften the student logits by applying softmax first and log() second
-            soft_targets = nn.functional.softmax(teacher_logits / T, dim=-1)
-            soft_prob = nn.functional.log_softmax(student_logits / T, dim=-1)
-
-            # Calculate the soft targets loss. Scaled by T**2 as suggested by the authors of the paper "Distilling the knowledge in a neural network"
-            soft_targets_loss = torch.sum(soft_targets * (soft_targets.log() - soft_prob)) / soft_prob.size()[0] * (T**2)
-
-            # Calculate the true label loss
-            label_loss = ce_loss(student_logits, labels)
-
-            # Weighted sum of the two losses
-            loss = soft_target_loss_weight * soft_targets_loss + ce_loss_weight * label_loss
-
+            y_pred = model(X)
+            loss = loss_fn(y_pred, y)
             loss.backward()
             optimizer.step()
+            #scheduler.step()
 
-            running_loss += loss.item()
+            train_loss += loss.item()
+            total += y.size(0)
+            correct += (y_pred.argmax(1) == y).sum().item()
 
-        #print(f"Epoch {epoch+1}/{epochs}, Loss: {running_loss / len(train_loader)}")
-    
 
-def test(model, test_loader, device):
-    model.to(device)
+    return train_loss / total, correct / total
+
+
+def test_loop(model, train_device, data, loss_fn):
     model.eval()
-
+    test_loss = 0
     correct = 0
     total = 0
 
     with torch.no_grad():
-        for inputs, labels in test_loader:
-            inputs, labels = inputs.float().to(device), labels.long().to(device)
+        for X, y in data:
+            X = X.float().to(train_device)
+            y = y.long().to(train_device)
+            model = model.to(train_device)
 
-            outputs = model(inputs)
-            _, predicted = torch.max(outputs.data, 1)
+            y_pred = model(X)
+            loss = loss_fn(y_pred, y)
 
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+            test_loss += loss.item()
+            total += y.size(0)
+            correct += (y_pred.argmax(1) == y).sum().item()
 
-    accuracy = 100 * correct / total
-    return accuracy
-
-def LRO_train_test_split(num_repetitions):
-    """
-    Perform Leave-Repetition-Out (LRO) train-test split.
-
-    Args:
-        num_repetitions (int): Total number of repetitions.
-
-    Returns:
-        tuple: Train and test repetition indices.
-    """
-    num_rep = np.arange(1, num_repetitions + 1).tolist()
-    test_numbers = random.sample(num_rep, k=int(len(num_rep) * 0.3))
-    train_numbers = [n for n in num_rep if n not in test_numbers]
-    return train_numbers, test_numbers
+    return test_loss / total, correct / total
 
 
 def prepare_data(path, session, subject, num_repetitions, training_type, num_gesture, selected_gesture, record_time, fs, notch_freq, low_cut, high_cut, order, window_time, overlap, no_channel, activate_session):
@@ -228,7 +205,7 @@ def initialize_model(model_type, in_channel, num_gesture, device,
     Returns:
         torch.nn.Module: Initialized model.
     """
-    load_path = f"MetaLearn_{model_type}_Input_{input_type}_Train_type_{training_type}.pth"
+    load_path = f"KD_{model_type}_Input_{input_type}_Train_Type_{training_type}.pth"
     weights_path = os.path.join(weights_path, load_path)
     if model_type == "EMGNet":
         if load_weights:
@@ -273,44 +250,14 @@ def initialize_model(model_type, in_channel, num_gesture, device,
             return ProxyLessNas(in_channel, num_gesture).to(device)
     else:
         raise ValueError("Invalid model type. Choose 'EMGNet', 'EMGNas', or 'MCUNet'.")
+    
 
 
 
-def run_kd(path, session, subject, num_repetitions, input_type, training_type, 
+def run_last_fine_tuning(path, session, subject, num_repetitions, input_type, training_type, 
            num_gesture, model_type, epochs, save_path, load_path, seed):
     
-    """
-    Run knowledge distillation.
 
-    Args:
-        path (str): Path to the dataset.
-        session (int): Session number.
-        subject (int): Subject number.
-        num_repetitions (int): Number of repetitions.
-        training_type (str): Training type ('TSTS' or 'LRO').
-        num_gesture (int): Number of gestures.
-        selected_gesture (list): List of selected gestures.
-        record_time (int): Recording time in seconds.
-        fs (int): Sampling frequency.
-        notch_freq (float): Notch filter frequency.
-        low_cut (float): Low cutoff frequency.
-        high_cut (float): High cutoff frequency.
-        order (int): Filter order.
-        window_time (int): Window time in milliseconds.
-        overlap (int): Overlap percentage.
-        no_channel (int): Number of channels.
-        activate_session (bool): Whether to activate session.
-        input_type (str): Input type ('raw', 'stft', or 'cwt').
-        model_type (str): Model type ('EMGNet', 'EMGNas', or 'MCUNet').
-        epochs (int): Number of training epochs.
-        learning_rate (float): Learning rate for the optimizer.
-        T (float): Temperature for knowledge distillation.
-        soft_target_loss_weight (float): Weight for the soft target loss.
-        ce_loss_weight (float): Weight for the cross-entropy loss.
-
-    Returns:
-        None
-    """
 
     # Hyperparameters
     record_time = 5
@@ -325,20 +272,13 @@ def run_kd(path, session, subject, num_repetitions, input_type, training_type,
     activate_session = True
     batch_size = 32
     learning_rate = 0.001
-    T=3
-    soft_target_loss_weight=0.25
-    ce_loss_weight=0.75
     selected_gesture = [1, 2, 3, 4, 5, 6, 7]
+    criterion = nn.CrossEntropyLoss()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
-
-    # Set random seed
     set_random_seed()
 
-    # Prepare data
-
-   # Data preparation
+       # Data preparation
     X_train, y_train, X_test, y_test = prepare_data(
         path, session, subject, num_repetitions, training_type, num_gesture, selected_gesture,
         record_time, fs, notch_freq, low_cut, high_cut, order, window_time, overlap, no_channel, activate_session
@@ -347,47 +287,72 @@ def run_kd(path, session, subject, num_repetitions, input_type, training_type,
     X_train, X_test = process_input_data(input_type, X_train, X_test)
     print(f"Train data shape: {X_train.shape}, Train labels shape: {y_train.shape}")
     print(f"Test data shape: {X_test.shape}, Test labels shape: {y_test.shape}")
+    
 
-    # Create datasets and dataloaders
+     # Create datasets and dataloaders
     train_dataset = EMGDataset(X_train, y_train)
     test_dataset = EMGDataset(X_test, y_test)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
 
-
     # Model initialization
     in_channel = X_train.shape[1]
-    set_random_seed(seed)
-    teacher_model_type = 'MCUNet'
-    teacher_model = initialize_model(teacher_model_type, in_channel, num_gesture, device, 
-                                     load_weights=True, weights_path=load_path,
-                                     session=session, subject=subject, 
-                                     input_type=input_type, training_type=training_type)
-    print(f"Teacher Model Loaded")
 
-    set_random_seed(seed)
-    student_model = initialize_model(model_type, in_channel, num_gesture, device, 
-                                     load_weights=True, weights_path=load_path,
-                                     session=session, subject=subject, 
-                                     input_type=input_type, training_type=training_type)
+    model = initialize_model(model_type, in_channel, num_gesture, device, 
+                                    load_weights=True, weights_path=load_path,
+                                    session=session, subject=subject, 
+                                    input_type=input_type, training_type=training_type)
+
+    print(f"Without Fine-Tunning")
+    _, test_acc = test_loop(model, device, test_dataloader, criterion)
+    print(f'Test accuracy {test_acc*100:.4f}%')
+
+
+    model = initialize_model(model_type, in_channel, num_gesture, device, 
+                                    load_weights=True, weights_path=load_path,
+                                    session=session, subject=subject, 
+                                    input_type=input_type, training_type=training_type)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+    for epoch in tqdm(range(epochs)):
+        train_loss, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
     
-    print(f"Student Model Loaded")
+    test_loss, test_acc = test_loop(model, device, test_dataloader, criterion)
+    print(f"Full Layer Fine-Tunning")
+    print(f'Test Accuracy Full-Train: {test_acc*100:.4f}%')
 
+    model = initialize_model(model_type, in_channel, num_gesture, device, 
+                                    load_weights=True, weights_path=load_path,
+                                    session=session, subject=subject, 
+                                    input_type=input_type, training_type=training_type)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
+    last_layer = str(list(model.named_children())[-1][0])
 
-    train_knowledge_distillation(teacher=teacher_model, student=student_model, train_loader=train_dataloader, epochs=epochs, learning_rate=learning_rate, T=T, soft_target_loss_weight=soft_target_loss_weight, ce_loss_weight=ce_loss_weight, device=device)
+    for name, param in model.named_parameters():
+        if name.startswith(last_layer):
+            print(f"Unfreezing {last_layer} Layer")
+            param.requires_grad = True
+        else:
+            param.requires_grad = False
     
+    for epoch in tqdm(range(epochs)):
+    
+        _, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
+
+    _, test_acc = test_loop(model, device, test_dataloader, criterion)
+    print(f"Full Layer Fine-Tunning")
+    print(f'Test Accuracy Full-Train: {test_acc*100:.4f}%')
+
     # Save the student model
     os.makedirs(save_path, exist_ok=True)
     save_dir = os.path.join(
         save_path,
-        f"KD_{model_type}_Input_{input_type}_Train_Type_{training_type}.pth"
+        f"Fine_Tuned_{model_type}_Input_{input_type}_Train_Type_{training_type}.pth"
     )
-    torch.save(student_model.state_dict(), save_dir)
-    print(f"Model saved to {save_dir}")
 
-    test_accuracy = test(student_model, test_dataloader, device)
-    print(f"Knowledge Distillation Test Accuracy: {test_accuracy:.2f}%")
+    torch.save(model.state_dict(), save_dir)
+    print(f"Model saved to {save_dir}")
 
 
 def main():
@@ -410,7 +375,7 @@ def main():
     args = parser.parse_args()
 
 
-    run_kd(
+    run_last_fine_tuning(
         args.path, args.session, args.subject, args.num_repetitions, args.input_type,
         args.training_type, args.num_gesture, args.model_type, args.epochs, 
         args.save_path, args.load_path, args.seed)
@@ -418,3 +383,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
