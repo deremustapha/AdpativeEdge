@@ -223,6 +223,7 @@ def prepare_pre_train_data(path):
     data, target  = window_with_overlap(data=X, label=y, window_time=window_time, overlap=overlap_percent, no_channel=no_channels, fs=fs)
     data, label = shuffle_data(data=data, labels=target)
     X_train, y_train, X_test, y_test = data_split(data=data, label=label, train_percent=train_ratio)
+    
     return X_train, y_train, X_test, y_test
 
 
@@ -302,7 +303,7 @@ def run_pretrain(path, session, subject, num_repetitions, input_type, training_t
     """
     # Hyperparameters
     record_time = 5
-    fs = 250
+    fs = 200
     no_channel = 8
     low_cut = 10.0
     high_cut = 120.0
@@ -325,6 +326,9 @@ def run_pretrain(path, session, subject, num_repetitions, input_type, training_t
     X_train, y_train, X_test, y_test = prepare_pre_train_data(path)
     # Data preprocessing
     X_train, X_test = process_input_data(input_type, X_train, X_test)
+
+    print(f"Train data shape: {X_train.shape}, Train labels shape: {y_train.shape}")
+    print(f"Test data shape: {X_test.shape}, Test labels shape: {y_test.shape}")
 
     # Create datasets and dataloaders
     train_dataset = EMGDataset(X_train, y_train)

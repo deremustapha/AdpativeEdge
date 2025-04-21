@@ -96,6 +96,38 @@ class EMGDataPreparation:
 
         return data_matrix, label_vectors
 
+    def load_multiple_subject(self, start_subject: int, end_subject: int, num_gesture: int, session, activate_session, train_repetition: List[int], test_repetition: List[int], selected_gesture: List[int]) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        
+        train_data, test_data = [], []
+        train_labels, test_labels = [], []
+
+        for i in range(start_subject, end_subject + 1):
+            print(f"Loading data for subject {i}...")
+            subject_path, train_gesture, test_gesture = self.get_per_subject_file(
+                subject_number=i, num_gesture=num_gesture, session=session,
+                activate_session=activate_session, 
+                train_repetition=train_repetition,
+                test_repetition=test_repetition)
+            
+            train_data_temp, test_data_temp = self.load_data_per_subject(
+                subject_path, selected_gesture=selected_gesture, train_gesture=train_gesture, test_gesture=test_gesture
+            )
+
+            train_data_temp, train_labels_temp = self.get_data_labels(train_data_temp)
+            test_data_temp, test_labels_temp = self.get_data_labels(test_data_temp)
+
+            train_data.append(train_data_temp)
+            test_data.append(test_data_temp)
+            train_labels.append(train_labels_temp)
+            test_labels.append(test_labels_temp)
+
+        train_X = np.concatenate(train_data, axis=1)
+        train_Y = np.concatenate(train_labels, axis=0)
+        test_X = np.concatenate(test_data, axis=1)
+        test_Y = np.concatenate(test_labels, axis=0)
+
+        return train_X, train_Y, test_X, test_Y
+
 
 
 def shuffle_data(data, labels):
