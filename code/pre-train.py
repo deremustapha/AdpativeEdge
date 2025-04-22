@@ -185,11 +185,17 @@ def initialize_model(model_type, in_channel, num_gesture, device):
         return MCUNet(in_channel, num_gesture).to(device)
     elif model_type == "ProxyLessNas":
         return ProxyLessNas(in_channel, num_gesture).to(device)
+    elif model_type == "MobileNet":
+        return 
     else:
         raise ValueError("Invalid model type. Choose 'EMGNet', 'EMGNas', or 'MCUNet'.")
 
 
+<<<<<<< HEAD
 def run_pretrain(path, input_type, num_gesture, window_time, overlap, model_type, epochs, save_path, seed):
+=======
+def run_pretrain(path, input_type, window_time, overlap, num_gesture, model_type, epochs, save_path, seed):
+>>>>>>> b40a245 (w)
     """
     Run the pretraining process.
 

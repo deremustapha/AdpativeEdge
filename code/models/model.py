@@ -237,7 +237,7 @@ class EMGFANNew(nn.Module):
         return x
 
 
-def MobileNetV3Small(number_gestures):
+def MobileNet(number_gestures):
     model = mobilenet_v3_small(pretrained=True)
     model.features[0][0] = nn.Conv2d(1, 16, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
     model.classifier[3] = nn.Linear(in_features=1024, out_features=number_gestures, bias=True)
