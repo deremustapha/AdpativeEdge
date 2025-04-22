@@ -298,6 +298,7 @@ def run_last_fine_tuning(path, session, subject, num_repetitions, input_type, tr
     # Model initialization
     in_channel = X_train.shape[1]
 
+    ####### None #########################################################
     model = initialize_model(model_type, in_channel, num_gesture, device, 
                                     load_weights=True, weights_path=load_path,
                                     session=session, subject=subject, 
@@ -306,8 +307,9 @@ def run_last_fine_tuning(path, session, subject, num_repetitions, input_type, tr
     print(f"Without Fine-Tunning")
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
     print(f'Test accuracy {test_acc*100:.4f}%')
+    ################################################################################
 
-
+    ####### Full-Train #########################################################
     model = initialize_model(model_type, in_channel, num_gesture, device, 
                                     load_weights=True, weights_path=load_path,
                                     session=session, subject=subject, 
@@ -317,19 +319,46 @@ def run_last_fine_tuning(path, session, subject, num_repetitions, input_type, tr
     for epoch in tqdm(range(epochs)):
         train_loss, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
     
-    test_loss, test_acc = test_loop(model, device, test_dataloader, criterion)
+    _, test_acc = test_loop(model, device, test_dataloader, criterion)
     print(f"Full Layer Fine-Tunning")
     print(f'Test Accuracy Full-Train: {test_acc*100:.4f}%')
+    ################################################################################
 
+    ####### TinyTL ######
     model = initialize_model(model_type, in_channel, num_gesture, device, 
                                     load_weights=True, weights_path=load_path,
                                     session=session, subject=subject, 
                                     input_type=input_type, training_type=training_type)
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
+    for name, param in model.named_parameters():
+    
+        if 'weight' in name:
+            param.requires_grad = False # Freeze the weights
+        elif 'bias' in name:
+            param.requires_grad = True # Unfreeze the bias
+    
+    for epoch in tqdm(range(epochs)):
+    
+        _, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
+
+    _, test_acc = test_loop(model, device, test_dataloader, criterion)
+    print(f"TinyTL  Train Fine-Tunning")
+    print(f'Test Accuracy TinyTL: {test_acc*100:.4f}%')
+    
+    ################################################################################
+
+    ####### Adaptive Edge Update ######
+    model = initialize_model(model_type, in_channel, num_gesture, device, 
+                                    load_weights=True, weights_path=load_path,
+                                    session=session, subject=subject, 
+                                    input_type=input_type, training_type=training_type)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     last_layer = str(list(model.named_children())[-1][0])
+    print(f"Last Layer: {last_layer}")
 
     for name, param in model.named_parameters():
+        print("Name: ", name)
         if name.startswith(last_layer):
             print(f"Unfreezing {last_layer} Layer")
             param.requires_grad = True
@@ -341,8 +370,9 @@ def run_last_fine_tuning(path, session, subject, num_repetitions, input_type, tr
         _, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
 
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
-    print(f"Full Layer Fine-Tunning")
-    print(f'Test Accuracy Full-Train: {test_acc*100:.4f}%')
+    print(f"Adaptive Edge Last  Train Fine-Tunning")
+    print(f'Test Accuracy Last-Train: {test_acc*100:.4f}%')
+    ################################################################################
 
     # Save the student model
     os.makedirs(save_path, exist_ok=True)
