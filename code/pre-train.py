@@ -176,6 +176,8 @@ def initialize_model(model_type, in_channel, num_gesture, device):
         return EMGNet(in_channel, num_gesture).to(device)
     elif model_type == "EMGNas":
         return EMGNas(in_channel, num_gesture).to(device)
+    elif model_type == "EMGNasFAN":
+        return EMGNasFAN(in_channel, num_gesture).to(device)
     elif model_type == "MCUNet":
         def MCUNet(input_channel, number_gestures):
             mcunet, _, _ = build_model(net_id="mcunet-in3", pretrained=True)
@@ -186,16 +188,12 @@ def initialize_model(model_type, in_channel, num_gesture, device):
     elif model_type == "ProxyLessNas":
         return ProxyLessNas(in_channel, num_gesture).to(device)
     elif model_type == "MobileNet":
-        return 
+        return MobileNet(in_channel, num_gesture).to(device)
     else:
         raise ValueError("Invalid model type. Choose 'EMGNet', 'EMGNas', or 'MCUNet'.")
 
 
-<<<<<<< HEAD
 def run_pretrain(path, input_type, num_gesture, window_time, overlap, model_type, epochs, save_path, seed):
-=======
-def run_pretrain(path, input_type, window_time, overlap, num_gesture, model_type, epochs, save_path, seed):
->>>>>>> b40a245 (w)
     """
     Run the pretraining process.
 
@@ -259,6 +257,8 @@ def run_pretrain(path, input_type, window_time, overlap, num_gesture, model_type
     print(f"Model saved to {save_dir}")
 
 
+def main():
+    """
     Main function to parse arguments and run the pretraining process.
     """
     parser = argparse.ArgumentParser(description="Train and evaluate the EMGNet model.")
@@ -274,8 +274,8 @@ def run_pretrain(path, input_type, window_time, overlap, num_gesture, model_type
     args = parser.parse_args()
 
     run_pretrain(
-        args.path,  args.input_type, args.num_gesture,args.window_time, 
-        args.overlap, args.model_type, args.epochs, args.save_path, args.seed
+        args.path, args.input_type,args.num_gesture, args.window_time, args.overlap,
+        args.model_type, args.epochs, args.save_path, args.seed
     )
 
 

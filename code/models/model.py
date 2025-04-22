@@ -4,70 +4,6 @@ import torch.nn.functional as F
 from torchvision.models import mobilenet_v3_small
 
 
-# Define the EMGNet model
-class EMGNet(nn.Module):
-    def __init__(self, in_channel, num_gesture):
-        super(EMGNet, self).__init__()
-        self.initial = nn.Conv2d(in_channel, 32, kernel_size=3)
-        self.relu1 = nn.ReLU()
-        self.conv2 = nn.Conv2d(32, 32, kernel_size=3)
-        self.relu2 = nn.ReLU()
-        self.maxpool2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
-        self.dropout = nn.Dropout(0.5)
-        self.flatten = nn.Flatten()
-        self.fc1 = nn.Linear(512, 516) # raw 1152 # stft 512
-        self.relu4 = nn.ReLU()
-        self.last = nn.Linear(516, num_gesture)
-
-    def forward(self, x):
-        x = self.initial(x)
-        x = self.relu1(x)
-        x = self.conv2(x)
-        x = self.relu2(x)
-        x = self.maxpool2(x)
-        x = self.dropout(x)
-        x = self.flatten(x)
-        x = self.fc1(x)
-        x = self.relu4(x)
-        x = self.last(x)
-
-        return x
-
-
-
-class EMGNas(nn.Module):
-    def __init__(self, in_channel, num_gesture):
-        super(EMGNas, self).__init__()
-
-        self.num_gesture = num_gesture
-
-        self.initial = nn.Conv2d(in_channel, 6, kernel_size=3, stride=1, padding=1)
-        self.relu1 = nn.ReLU()
-        self.maxpool1 = nn.MaxPool2d(kernel_size=(2, 2))
-        self.conv2 = nn.Conv2d(6, 9, kernel_size=3, stride=1, padding=1)
-        self.relu2 = nn.ReLU()
-        self.maxpool2 = nn.MaxPool2d(kernel_size=(2, 2))
-        self.globalpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.flatten = nn.Flatten()
-        self.fc1 = nn.Linear(9, 13) #1280,40
-        self.relu3 = nn.ReLU()
-        self.last = nn.Linear(13, self.num_gesture)
-    
-    def forward(self, x):
-        x = self.initial(x)
-        x = self.relu1(x)
-        x = self.maxpool1(x)
-        x = self.conv2(x)
-        x = self.relu2(x)
-        x = self.maxpool2(x)
-        x = self.globalpool(x)
-        x = self.flatten(x)
-        x = self.fc1(x)
-        x = self.relu3(x)
-        x = self.last(x)
-        return x
-    
-
 
 class FANLayer(nn.Module):
 
@@ -103,18 +39,112 @@ class FANLayer(nn.Module):
         """
         
         # Apply the linear transformation followed by the activation for the g component
-
         g = self.activation(self.input_linear_g(src))
-        
         # Apply the linear transformation for the p component
         p = self.input_linear_p(src)
-
         # Concatenate cos(p), sin(p), and activated g along the last dimension
         output = torch.cat((torch.cos(p), torch.sin(p), g), dim=-1)
 
         
         return output
+    
 
+
+# Define the EMGNet model
+class EMGNet(nn.Module):
+    def __init__(self, in_channel, num_gesture):
+        super(EMGNet, self).__init__()
+        self.initial = nn.Conv2d(in_channel, 32, kernel_size=3)
+        self.relu1 = nn.ReLU()
+        self.conv2 = nn.Conv2d(32, 32, kernel_size=3)
+        self.relu2 = nn.ReLU()
+        self.maxpool2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
+        self.dropout = nn.Dropout(0.5)
+        self.flatten = nn.Flatten()
+        self.fc1 = nn.Linear(1152, 516) # raw 1152 # stft 512
+        self.relu4 = nn.ReLU()
+        self.last = nn.Linear(516, num_gesture)
+
+    def forward(self, x):
+        x = self.initial(x)
+        x = self.relu1(x)
+        x = self.conv2(x)
+        x = self.relu2(x)
+        x = self.maxpool2(x)
+        x = self.dropout(x)
+        x = self.flatten(x)
+        x = self.fc1(x)
+        x = self.relu4(x)
+        x = self.last(x)
+
+        return x
+
+
+
+class EMGNas(nn.Module):
+    def __init__(self, in_channel, num_gesture):
+        super(EMGNas, self).__init__()
+        similarparameter=False
+        self.similarparameter = similarparameter
+
+        self.num_gesture = num_gesture
+
+        self.initial = nn.Conv2d(in_channel, 6, kernel_size=3, stride=1, padding=1)
+        self.relu1 = nn.ReLU()
+        self.maxpool1 = nn.MaxPool2d(kernel_size=(2, 2))
+        self.conv2 = nn.Conv2d(6, 9, kernel_size=3, stride=1, padding=1)
+        self.relu2 = nn.ReLU()
+        self.maxpool2 = nn.MaxPool2d(kernel_size=(2, 2))
+        self.globalpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.flatten = nn.Flatten()
+        self.fc1 = nn.Linear(9, 13) #1280,40
+        self.relu3 = nn.ReLU()
+        self.last = nn.Linear(13, self.num_gesture)
+    
+    def forward(self, x):
+        x = self.initial(x)
+        x = self.relu1(x)
+        x = self.maxpool1(x)
+        x = self.conv2(x)
+        x = self.relu2(x)
+        x = self.maxpool2(x)
+        x = self.globalpool(x)
+        x = self.flatten(x)
+        x = self.fc1(x)
+        x = self.relu3(x)
+        x = self.last(x)
+        return x
+    
+
+class EMGNasFAN(nn.Module):
+    def __init__(self, in_channel, num_gesture):
+        super(EMGNasFAN, self).__init__()
+        similarparameter=False
+        self.similarparameter = similarparameter
+        self.num_gesture = num_gesture
+
+        self.initial = nn.Conv2d(in_channel, 6, kernel_size=3, stride=1, padding=1)
+        self.relu1 = nn.ReLU()
+        self.maxpool1 = nn.MaxPool2d(kernel_size=(2, 2))
+        self.conv2 = nn.Conv2d(6, 9, kernel_size=3, stride=1, padding=1)
+        self.relu2 = nn.ReLU()
+        self.maxpool2 = nn.MaxPool2d(kernel_size=(2, 2))
+        self.flatten = nn.Flatten()
+        self.scalar = lambda x: x*4//3 if self.similarparameter else x
+        self.fc1 = FANLayer(90, self.scalar(256))  # raw =180, stft=90
+        self.last = nn.Linear(256, self.num_gesture)
+    
+    def forward(self, x):
+        x = self.initial(x)
+        x = self.relu1(x)
+        x = self.maxpool1(x)
+        x = self.conv2(x)
+        x = self.relu2(x)
+        x = self.maxpool2(x)
+        x = self.flatten(x)
+        x = self.fc1(x)
+        x = self.last(x)
+        return x
 
 
 class EMGFAN(nn.Module):
@@ -146,6 +176,8 @@ class EMGFAN(nn.Module):
         x = self.FAN(x)
         x = self.last(x)
         return x
+
+
 
 
 def binarize(tensor):
@@ -205,17 +237,27 @@ class EMGFANNew(nn.Module):
 
         self.first = nn.Conv2d(self.in_channel, 32, kernel_size=3)
         self.bn1 = nn.BatchNorm2d(32)
+        #self.htanh1 = nn.ReLU()
         self.htanh1 = nn.Hardtanh()
+        #self.conv2 = nn.Conv2d(32, 32, kernel_size=3)
+
         self.conv2 = nn.Conv2d(32, 32, kernel_size=3)
         self.bn2 = nn.BatchNorm2d(32)
+        #self.htanh2 = nn.ReLU()
         self.htanh2 = nn.Hardtanh()
+
+        # self.conv3 = nn.Conv2d(32, 32, kernel_size=1)
+        # self.bn = nn.BatchNorm2d(32)
+        # self.act = nn.ReLU()
 
         self.maxpool2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
         self.dropout = nn.Dropout(0.5)
         self.flatten = nn.Flatten()
+
         self.scalar = lambda x: x*4//3 if self.similarparameter else x
         self.FAN = FANLayer(576, self.scalar(256))
         self.bn3 = nn.BatchNorm1d(256)
+        #self.htanh3 = nn.ReLU()
         self.htanh3 = nn.Hardtanh()
 
         self.last = nn.Linear(256, self.out_gesture)
@@ -237,9 +279,9 @@ class EMGFANNew(nn.Module):
         return x
 
 
-def MobileNet(number_gestures):
+def MobileNet(input_channel, number_gestures):
     model = mobilenet_v3_small(pretrained=True)
-    model.features[0][0] = nn.Conv2d(1, 16, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+    model.features[0][0] = nn.Conv2d(input_channel, 16, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
     model.classifier[3] = nn.Linear(in_features=1024, out_features=number_gestures, bias=True)
     return model
 
