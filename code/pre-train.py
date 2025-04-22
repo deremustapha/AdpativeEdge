@@ -111,7 +111,7 @@ def prepare_pre_train_data(path, window_time, overlap, num_gesture):
     low_cut=10.0
     high_cut=99.0 
     order=5
-    train_ratio = 80 
+    train_percent = 80 
 
     X_male, y_male = load_all_cote_participant(path=path, T_participant=total_male, male=True, T_gestures=num_gesture)
     X_female, y_female = load_all_cote_participant(path=path, T_participant=total_female, male=False, T_gestures=num_gesture)
@@ -127,7 +127,7 @@ def prepare_pre_train_data(path, window_time, overlap, num_gesture):
 
     data, target  = window_with_overlap(data=X, label=y, window_time=window_time, overlap=overlap, no_channel=no_channels, fs=fs)
     data, label = shuffle_data(data=data, labels=target)
-    X_train, y_train, X_test, y_test = data_split(data=data, label=label, train_percent=train_ratio)
+    X_train, y_train, X_test, y_test = data_split(data=data, label=label, train_percent=train_percent)
     
     return X_train, y_train, X_test, y_test
 
@@ -245,7 +245,7 @@ def run_pretrain(path, input_type, num_gesture, window_time, overlap, model_type
 
     # Testing loop
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
-    print(f"Testing Accuracy: {test_acc * 100:.2f}%")
+    print(f"The PreTraining Test Accuracy is: {test_acc * 100:.2f}%")
 
     # Save the model
     os.makedirs(save_path, exist_ok=True)

@@ -129,9 +129,10 @@ class EMGNasFAN(nn.Module):
         self.conv2 = nn.Conv2d(6, 9, kernel_size=3, stride=1, padding=1)
         self.relu2 = nn.ReLU()
         self.maxpool2 = nn.MaxPool2d(kernel_size=(2, 2))
+        self.globalpool = nn.AdaptiveAvgPool2d((1, 1))
         self.flatten = nn.Flatten()
         self.scalar = lambda x: x*4//3 if self.similarparameter else x
-        self.fc1 = FANLayer(90, self.scalar(256))  # raw =180, stft=90
+        self.fc1 = FANLayer(9, self.scalar(256))  # raw =180, stft=90
         self.last = nn.Linear(256, self.num_gesture)
     
     def forward(self, x):
@@ -141,6 +142,7 @@ class EMGNasFAN(nn.Module):
         x = self.conv2(x)
         x = self.relu2(x)
         x = self.maxpool2(x)
+        x = self.globalpool(x)
         x = self.flatten(x)
         x = self.fc1(x)
         x = self.last(x)
@@ -363,4 +365,3 @@ class CTRLEMG(nn.Module):
 # model = GestureRecognitionModel(input_dim=128, num_gestures=9)
 # input_tensor = torch.randn(32, 128)  # Batch size of 32, input dimension of 128
 # output = model(input_tensor)
-
