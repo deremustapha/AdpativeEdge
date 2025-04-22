@@ -259,8 +259,6 @@ def run_pretrain(path, input_type, window_time, overlap, num_gesture, model_type
     print(f"Model saved to {save_dir}")
 
 
-def main():
-    """
     Main function to parse arguments and run the pretraining process.
     """
     parser = argparse.ArgumentParser(description="Train and evaluate the EMGNet model.")
