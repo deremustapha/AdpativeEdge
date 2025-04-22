@@ -185,13 +185,11 @@ def initialize_model(model_type, in_channel, num_gesture, device):
         return MCUNet(in_channel, num_gesture).to(device)
     elif model_type == "ProxyLessNas":
         return ProxyLessNas(in_channel, num_gesture).to(device)
-    elif model_type == "MobileNet":
-        return 
     else:
         raise ValueError("Invalid model type. Choose 'EMGNet', 'EMGNas', or 'MCUNet'.")
 
 
-def run_pretrain(path, session, subject, input_type, window_time, overlap, num_gesture, model_type, epochs, save_path, seed):
+def run_pretrain(path, input_type, num_gesture, window_time, overlap, model_type, epochs, save_path, seed):
     """
     Run the pretraining process.
 
@@ -249,7 +247,7 @@ def run_pretrain(path, session, subject, input_type, window_time, overlap, num_g
     os.makedirs(save_path, exist_ok=True)
     save_dir = os.path.join(
         save_path,
-        f"PreTrain_{model_type}_Session_{session}_Subject_{subject}_Input_{input_type}.pth"
+        f"PreTrain_{model_type}_Input_{input_type}.pth"
     )
     torch.save(model.state_dict(), save_dir)
     print(f"Model saved to {save_dir}")
@@ -261,12 +259,10 @@ def main():
     """
     parser = argparse.ArgumentParser(description="Train and evaluate the EMGNet model.")
     parser.add_argument("--path", type=str, default='/mnt/d/AI-Workspace/sEMGClassification/AdaptiveModel/data/6_Flex_BMIS/flex_bmis/mat_data', required=True, help="Path to the dataset.")
-    parser.add_argument("--session", type=int, default=1, help="Select one of four sessions.")
-    parser.add_argument("--subject", type=int, default=1, help="Select subject.")
-    parser.add_argument("--window_time", type=int, default=200, help="Number of repetitions.")
-    parser.add_argument("--overlap", type=int, default=80, help="Number of repetitions.")
     parser.add_argument("--input_type", type=str, default='raw', required=True, help="Choose 'raw', 'stft', or 'cwt'.")
     parser.add_argument("--num_gesture", type=int, default=7, help="Number of gestures.")
+    parser.add_argument("--window_time", type=int, default=200, help="Number of repetitions.")
+    parser.add_argument("--overlap", type=int, default=80, help="Number of repetitions.")
     parser.add_argument("--model_type", type=str, default="EMGNet", help="Model name.")
     parser.add_argument("--epochs", type=int, default=50, help="Number of epochs.")
     parser.add_argument("--save_path", type=str, default="/mnt/d/AI-Workspace/sEMGClassification/EdgeLastTrain/model_weights", help="Path to save the model.")
@@ -274,8 +270,8 @@ def main():
     args = parser.parse_args()
 
     run_pretrain(
-        args.path, args.session, args.subject, args.window_time, args.overlap, args.input_type,
-        args.num_gesture, args.model_type, args.epochs, args.save_path, args.seed
+        args.path,  args.input_type, args.num_gesture,args.window_time, 
+        args.overlap, args.model_type, args.epochs, args.save_path, args.seed
     )
 
 
