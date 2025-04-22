@@ -88,6 +88,24 @@ def test_loop(model, train_device, data, loss_fn):
     return test_loss / total, correct / total
 
 
+
+
+def LRO_train_test_split(num_repetitions):
+    """
+    Perform Leave-Repetition-Out (LRO) train-test split.
+
+    Args:
+        num_repetitions (int): Total number of repetitions.
+
+    Returns:
+        tuple: Train and test repetition indices.
+    """
+    num_rep = np.arange(1, num_repetitions + 1).tolist()
+    test_numbers = random.sample(num_rep, k=int(len(num_rep) * 0.3))
+    train_numbers = [n for n in num_rep if n not in test_numbers]
+    return train_numbers, test_numbers
+
+
 def prepare_data(path, session, subject, num_repetitions, training_type, num_gesture, selected_gesture, record_time, fs, notch_freq, low_cut, high_cut, order, window_time, overlap, no_channel, activate_session):
     """
     Prepare training and testing data based on the training type.
