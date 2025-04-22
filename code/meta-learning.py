@@ -174,8 +174,8 @@ def test(model, test_x, test_y, n_way, n_support, n_query, test_episode):
     return avg_loss, avg_acc
 
 
-def prepare_meta_data(path, session, subject, stop_subject, activate_session,
-                    num_gesture, num_repetitions, selected_gesture,
+def prepare_meta_data(path, session, subject, stop_subject,
+                    num_gesture, num_repetitions,
                     window_time, overlap):
     """
     Prepare training and testing data based on the training type.
@@ -207,10 +207,12 @@ def prepare_meta_data(path, session, subject, stop_subject, activate_session,
     fs = 200
     no_channel = 8
     low_cut = 10.0
-    high_cut = 120.0
+    high_cut = 99.0
     notch_freq = 60.0
     order = 5
     train_percent=80 
+    activate_session = False
+    selected_gesture = [1, 2, 3, 4, 5, 6, 7]
 
 
     emg_prep = EMGDataPreparation(base_path=path, fs=fs, rec_time=record_time)
@@ -219,8 +221,6 @@ def prepare_meta_data(path, session, subject, stop_subject, activate_session,
     train_repetition = np.arange(1, num_repetitions + 1).tolist()
     test_repetition = [1, 2]
   
-
-    
     train_data, train_labels, _, _ = emg_prep.load_multiple_subject(start_subject=subject, end_subject=stop_subject, session=session, activate_session=activate_session,
             train_repetition=train_repetition, test_repetition=test_repetition, num_gesture=num_gesture, selected_gesture=selected_gesture)
 
@@ -245,8 +245,9 @@ def prepare_meta_data(path, session, subject, stop_subject, activate_session,
 
     return X_train, y_train, X_test, y_test
 
-def initialize_model(model_type, in_channel, num_gesture, device, 
-                     load_weights, weights_path, input_type):
+
+def initialize_model(model_type, input_type, in_channel, num_gesture, 
+                     device, load_weights, weights_path):
     """
     Initialize the model based on the model type.
 
@@ -270,6 +271,15 @@ def initialize_model(model_type, in_channel, num_gesture, device,
         else:
             print("Loading default weights")
             return EMGNet(in_channel, num_gesture).to(device)
+    elif model_type == "EMGNetFAN":
+        if load_weights:
+            model = EMGNetFAN(in_channel, num_gesture).to(device)
+            model.load_state_dict(torch.load(weights_path))
+            print(f"Loaded weights from {weights_path}")
+            return model
+        else:
+            print("Loading default weights")
+            return EMGNetFAN(in_channel, num_gesture).to(device)
     elif model_type == "EMGNas":
         if load_weights:
             model = EMGNas(in_channel, num_gesture).to(device)
@@ -302,6 +312,15 @@ def initialize_model(model_type, in_channel, num_gesture, device,
         else:
             print("Loading default weights")
             return MCUNet(in_channel, num_gesture).to(device)
+    elif model_type =="MobileNet":
+        if load_weights:
+            model = MobileNet(in_channel, num_gesture).to(device)
+            model.load_state_dict(torch.load(weights_path))
+            print(f"Loaded weights from {weights_path}")
+            return model
+        else:
+            print("Loading default weights")
+            return MobileNet(in_channel, num_gesture).to(device)
     elif model_type == "ProxyLessNas":
         if load_weights:
             model = ProxyLessNas(in_channel, num_gesture).to(device)
@@ -340,9 +359,9 @@ def process_input_data(input_type, X_train, X_test):
         raise ValueError("Invalid input type. Choose 'raw', 'stft', or 'cwt'.")
     return X_train, X_test
 
-def run_meta_learning(path, session, start_subject, stop_subject, activate_session,
+def run_meta_learning(path, session, start_subject, stop_subject,
                       num_ways, num_support, num_query, input_type, 
-                      num_gesture, num_repetitions, selected_gesture, window_time, overlap,
+                      num_gesture, num_repetitions, window_time, overlap,
                       model_type, max_epoch, epochs, save_path, load_path, seed):
 
     # Hyperparameters
@@ -351,10 +370,9 @@ def run_meta_learning(path, session, start_subject, stop_subject, activate_sessi
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Data preparation
-    
     X_train, y_train, X_test, y_test = prepare_meta_data(
-        path, session, start_subject, stop_subject, activate_session, 
-        num_gesture,  num_repetitions, selected_gesture, window_time, overlap)
+        path, session, start_subject, stop_subject, 
+        num_gesture,  num_repetitions, window_time, overlap)
 
     # Set random seed
     X_train, X_test = process_input_data(input_type, X_train, X_test)
@@ -365,9 +383,9 @@ def run_meta_learning(path, session, start_subject, stop_subject, activate_sessi
     
     in_channel = X_train.shape[1]
     set_random_seed(seed)
-    model = initialize_model(model_type, in_channel, num_gesture, device,
-                             load_weights=True, weights_path=load_path,
-                             session=session, subject=start_subject)
+    model = initialize_model(model_type, input_type, in_channel, num_gesture,
+                            device, load_weights=True, weights_path=load_path)
+
 
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -399,14 +417,12 @@ def main():
     parser.add_argument("--session", type=int, default=1, help="Select one of four sessions.")
     parser.add_argument("--start_subject", type=int, default=1, help="Select Start subject.")
     parser.add_argument("--stop_subject", type=int, default=1, help="Select Stop subject.")
-    parser.add_argument("--activate_session", type=bool, default=False, help="Activate session.")
     parser.add_argument("--num_ways", type=int, default=7, help="Number of gestures.")
     parser.add_argument("--num_support", type=int, default=5, help="Number of support samples.")
     parser.add_argument("--num_query", type=int, default=5, help="Number of query samples.")
     parser.add_argument("--input_type", type=str, default='raw', required=True, help="Choose 'raw', 'stft', or 'cwt'.")
     parser.add_argument("--num_gesture", type=int, default=7, help="Number of gestures.")
     parser.add_argument("--num_repetitions", type=int, default=6, help="Number of repetitions.")
-    parser.add_argument("--selected_gesture", type=list, default=[1, 2, 3, 4, 5, 6, 7], help="Select gestures.")
     parser.add_argument("--window_time", type=int, default=200, help="Window time in milliseconds.")
     parser.add_argument("--overlap", type=int, default=70, help="Overlap percentage.")
     parser.add_argument("--model_type", type=str, default="EMGNet", help="Model name.")
@@ -418,9 +434,9 @@ def main():
     args = parser.parse_args()
 
     run_meta_learning(
-        args.path, args.session, args.start_subject, args.stop_subject, args.activate_session,
+        args.path, args.session, args.start_subject, args.stop_subject,
         args.num_ways, args.num_support, args.num_query, args.input_type,
-        args.num_gesture, args.num_repetitions, args.selected_gesture, args.window_time,  args.overlap, 
+        args.num_gesture, args.num_repetitions, args.window_time,  args.overlap, 
         args.model_type, args.max_epoch, args.epochs, args.save_path, args.load_path, args.seed)
 
 

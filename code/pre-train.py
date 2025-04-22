@@ -174,6 +174,8 @@ def initialize_model(model_type, in_channel, num_gesture, device):
     """
     if model_type == "EMGNet":
         return EMGNet(in_channel, num_gesture).to(device)
+    elif model_type == "EMGNetFAN":
+        return EMGNetFAN(in_channel, num_gesture).to(device)
     elif model_type == "EMGNas":
         return EMGNas(in_channel, num_gesture).to(device)
     elif model_type == "EMGNasFAN":

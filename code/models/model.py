@@ -76,7 +76,35 @@ class EMGNet(nn.Module):
         x = self.fc1(x)
         x = self.relu4(x)
         x = self.last(x)
+        return x
 
+
+class EMGNetFAN(nn.Module):
+    def __init__(self, in_channel, num_gesture):
+        super(EMGNetFAN, self).__init__()
+        similarparameter=False
+        self.similarparameter = similarparameter
+        self.initial = nn.Conv2d(in_channel, 32, kernel_size=3)
+        self.relu1 = nn.ReLU()
+        self.conv2 = nn.Conv2d(32, 32, kernel_size=3)
+        self.relu2 = nn.ReLU()
+        self.maxpool2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
+        self.dropout = nn.Dropout(0.5)
+        self.flatten = nn.Flatten()
+        self.scalar = lambda x: x*4//3 if self.similarparameter else x
+        self.fc1 = FANLayer(1152, self.scalar(256))  # raw 1152 # stft 512
+        self.last = nn.Linear(256, num_gesture)
+
+    def forward(self, x):
+        x = self.initial(x)
+        x = self.relu1(x)
+        x = self.conv2(x)
+        x = self.relu2(x)
+        x = self.maxpool2(x)
+        x = self.dropout(x)
+        x = self.flatten(x)
+        x = self.fc1(x)
+        x = self.last(x)
         return x
 
 
