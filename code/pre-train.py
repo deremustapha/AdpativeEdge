@@ -185,6 +185,8 @@ def initialize_model(model_type, in_channel, num_gesture, device):
         return MCUNet(in_channel, num_gesture).to(device)
     elif model_type == "ProxyLessNas":
         return ProxyLessNas(in_channel, num_gesture).to(device)
+    elif model_type == "MobileNet":
+        return 
     else:
         raise ValueError("Invalid model type. Choose 'EMGNet', 'EMGNas', or 'MCUNet'.")
 
