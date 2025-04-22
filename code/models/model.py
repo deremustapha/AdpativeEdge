@@ -15,7 +15,7 @@ class EMGNet(nn.Module):
         self.maxpool2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
         self.dropout = nn.Dropout(0.5)
         self.flatten = nn.Flatten()
-        self.fc1 = nn.Linear(1152, 516) # raw 1152 # stft 512
+        self.fc1 = nn.Linear(512, 516) # raw 1152 # stft 512
         self.relu4 = nn.ReLU()
         self.last = nn.Linear(516, num_gesture)
 
@@ -205,30 +205,17 @@ class EMGFANNew(nn.Module):
 
         self.first = nn.Conv2d(self.in_channel, 32, kernel_size=3)
         self.bn1 = nn.BatchNorm2d(32)
-        #self.htanh1 = nn.ReLU()
         self.htanh1 = nn.Hardtanh()
-        #self.conv2 = nn.Conv2d(32, 32, kernel_size=3)
-
         self.conv2 = nn.Conv2d(32, 32, kernel_size=3)
         self.bn2 = nn.BatchNorm2d(32)
-        #self.htanh2 = nn.ReLU()
         self.htanh2 = nn.Hardtanh()
-
-        # self.conv3 = nn.Conv2d(32, 32, kernel_size=1)
-        # self.bn = nn.BatchNorm2d(32)
-        # self.act = nn.ReLU()
-
-
-        
 
         self.maxpool2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
         self.dropout = nn.Dropout(0.5)
         self.flatten = nn.Flatten()
-
         self.scalar = lambda x: x*4//3 if self.similarparameter else x
         self.FAN = FANLayer(576, self.scalar(256))
         self.bn3 = nn.BatchNorm1d(256)
-        #self.htanh3 = nn.ReLU()
         self.htanh3 = nn.Hardtanh()
 
         self.last = nn.Linear(256, self.out_gesture)
