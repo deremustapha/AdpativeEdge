@@ -388,7 +388,7 @@ def run_kd(path, session, subject, input_type, num_gesture,
 
 
     # Set random seed
-    set_random_seed()
+    set_random_seed(seed)
 
 # prepare_data(path, session, subject, num_gesture, num_repetitions,
 #                 training_type, window_time, overlap)

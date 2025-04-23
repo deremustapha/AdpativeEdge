@@ -105,8 +105,8 @@ def LRO_train_test_split(num_repetitions):
     train_numbers = [n for n in num_rep if n not in test_numbers]
     return train_numbers, test_numbers
 
-
-def prepare_data(path, session, subject, num_repetitions, training_type, num_gesture, selected_gesture, record_time, fs, notch_freq, low_cut, high_cut, order, window_time, overlap, no_channel, activate_session):
+def prepare_data(path, session, subject, num_gesture, num_repetitions,
+                training_type, window_time, overlap):
     """
     Prepare training and testing data based on the training type.
 
@@ -132,17 +132,44 @@ def prepare_data(path, session, subject, num_repetitions, training_type, num_ges
     Returns:
         tuple: Training and testing data and labels.
     """
+    record_time=5
+    fs=250
+    no_channel=8
+    low_cut = 10.0
+    high_cut=120.0
+    notch_freq=60.0
+    order=5
+    train_percent=80 
+    activate_session = True
+    selected_gesture = [1, 2, 3, 4, 5, 6, 7]
+
     emg_prep = EMGDataPreparation(base_path=path, fs=fs, rec_time=record_time)
 
     if training_type == "tsts":
         train_repetition = np.arange(1, num_repetitions + 1).tolist()
         test_repetition = [1, 2]
+        subject_path, train_gesture, test_gesture = emg_prep.get_per_subject_file(
+            subject_number=subject, num_gesture=num_gesture, session=session, activate_session=activate_session,
+            train_repetition=train_repetition, test_repetition=test_repetition
+        )
+        train_data, _ = emg_prep.load_data_per_subject(
+            subject_path, selected_gesture=selected_gesture, train_gesture=train_gesture, test_gesture=test_gesture
+        )
+        train_data, train_labels = emg_prep.get_data_labels(train_data)
+        preprocess = EMGPreprocessing(fs=fs, notch_freq=notch_freq, low_cut=low_cut, high_cut=high_cut, order=order)
+        train_data = preprocess.remove_mains(train_data)
+        train_data = preprocess.highpass_filter(train_data)
+        window_train_data, window_train_labels = emg_prep.window_with_overlap(
+            train_data, train_labels, window_time=window_time, overlap=overlap, no_channel=no_channel)
+        window_train_data, window_train_labels = shuffle_data(window_train_data, window_train_labels)   
+        window_train_data, window_train_labels, window_test_data, window_test_labels = data_split(
+                window_train_data, window_train_labels, train_percent=train_percent) 
+        X_train, y_train = shuffle_data(window_train_data, window_train_labels)
+        X_test, y_test = shuffle_data(window_test_data, window_test_labels) 
+        return X_train, y_train, X_test, y_test 
+    
     elif training_type == "lro":
         train_repetition, test_repetition = LRO_train_test_split(num_repetitions)
-    else:
-        raise ValueError("Invalid training type. Choose 'TSTS' or 'LRO'.")
-
-    if training_type == "tsts":
         subject_path, train_gesture, test_gesture = emg_prep.get_per_subject_file(
             subject_number=subject, num_gesture=num_gesture, session=session, activate_session=activate_session,
             train_repetition=train_repetition, test_repetition=test_repetition
@@ -150,36 +177,28 @@ def prepare_data(path, session, subject, num_repetitions, training_type, num_ges
         train_data, test_data = emg_prep.load_data_per_subject(
             subject_path, selected_gesture=selected_gesture, train_gesture=train_gesture, test_gesture=test_gesture
         )
-    elif training_type == "lro":
-        subject_path, train_gesture, test_gesture = emg_prep.get_per_subject_file(
-            subject_number=subject, num_gesture=num_gesture, session=session, activate_session=activate_session,
-            train_repetition=train_repetition, test_repetition=test_repetition
+        train_data, train_labels = emg_prep.get_data_labels(train_data)
+        test_data, test_labels = emg_prep.get_data_labels(test_data)
+
+        preprocess = EMGPreprocessing(fs=fs, notch_freq=notch_freq, low_cut=low_cut, high_cut=high_cut, order=order)
+        train_data = preprocess.remove_mains(train_data)
+        test_data = preprocess.remove_mains(test_data)
+        train_data = preprocess.highpass_filter(train_data)
+        test_data = preprocess.highpass_filter(test_data)
+
+        window_train_data, window_train_labels = emg_prep.window_with_overlap(
+            train_data, train_labels, window_time=window_time, overlap=overlap, no_channel=no_channel
         )
-        train_data, test_data = emg_prep.load_data_per_subject(
-            subject_path, selected_gesture=selected_gesture, train_gesture=train_gesture, test_gesture=test_gesture
+        window_test_data, window_test_labels = emg_prep.window_with_overlap(
+            test_data, test_labels, window_time=window_time, overlap=overlap, no_channel=no_channel
         )
+
+        X_train, y_train = shuffle_data(window_train_data, window_train_labels)
+        X_test, y_test = shuffle_data(window_test_data, window_test_labels)
+
+        return X_train, y_train, X_test, y_test
     else:
         raise ValueError("Invalid training type. Choose 'TSTS' or 'LRO'.")
-    train_data, train_labels = emg_prep.get_data_labels(train_data)
-    test_data, test_labels = emg_prep.get_data_labels(test_data)
-
-    preprocess = EMGPreprocessing(fs=fs, notch_freq=notch_freq, low_cut=low_cut, high_cut=high_cut, order=order)
-    train_data = preprocess.remove_mains(train_data)
-    test_data = preprocess.remove_mains(test_data)
-    train_data = preprocess.highpass_filter(train_data)
-    test_data = preprocess.highpass_filter(test_data)
-
-    window_train_data, window_train_labels = emg_prep.window_with_overlap(
-        train_data, train_labels, window_time=window_time, overlap=overlap, no_channel=no_channel
-    )
-    window_test_data, window_test_labels = emg_prep.window_with_overlap(
-        test_data, test_labels, window_time=window_time, overlap=overlap, no_channel=no_channel
-    )
-
-    X_train, y_train = shuffle_data(window_train_data, window_train_labels)
-    X_test, y_test = shuffle_data(window_test_data, window_test_labels)
-
-    return X_train, y_train, X_test, y_test
 
 
 def process_input_data(input_type, X_train, X_test):
@@ -208,9 +227,9 @@ def process_input_data(input_type, X_train, X_test):
     return X_train, X_test
 
 
-def initialize_model(model_type, in_channel, num_gesture, device, 
-                     load_weights, weights_path, 
-                     session, subject, input_type, training_type):
+def initialize_model(model_type, input_type, training_type, 
+                    in_channel, num_gesture, device, load_weights,
+                    weights_path):
     """
     Initialize the model based on the model type.
 
@@ -234,6 +253,15 @@ def initialize_model(model_type, in_channel, num_gesture, device,
         else:
             print("Loading default weights")
             return EMGNet(in_channel, num_gesture).to(device)
+    elif model_type == "EMGNetFAN":
+        if load_weights:
+            model = EMGNetFAN(in_channel, num_gesture).to(device)
+            model.load_state_dict(torch.load(weights_path))
+            print(f"Loaded weights from {weights_path}")
+            return model
+        else:
+            print("Loading default weights")
+            return EMGNetFAN(in_channel, num_gesture).to(device)
     elif model_type == "EMGNas":
         if load_weights:
             model = EMGNas(in_channel, num_gesture).to(device)
@@ -243,6 +271,15 @@ def initialize_model(model_type, in_channel, num_gesture, device,
         else:
             print("Loading default weights")
             return EMGNas(in_channel, num_gesture).to(device)
+    elif model_type == "EMGNasFAN":
+        if load_weights:
+            model = EMGNasFAN(in_channel, num_gesture).to(device)
+            model.load_state_dict(torch.load(weights_path))
+            print(f"Loaded weights from {weights_path}")
+            return model
+        else:
+            print("Loading default weights")
+            return EMGNasFAN(in_channel, num_gesture).to(device)
     elif model_type == "MCUNet":
         def MCUNet(input_channel, number_gestures):
             mcunet, _, _ = build_model(net_id="mcunet-in3", pretrained=True)
@@ -257,6 +294,15 @@ def initialize_model(model_type, in_channel, num_gesture, device,
         else:
             print("Loading default weights")
             return MCUNet(in_channel, num_gesture).to(device)
+    elif model_type =="MobileNet":
+        if load_weights:
+            model = MobileNet(in_channel, num_gesture).to(device)
+            model.load_state_dict(torch.load(weights_path))
+            print(f"Loaded weights from {weights_path}")
+            return model
+        else:
+            print("Loading default weights")
+            return MobileNet(in_channel, num_gesture).to(device)
     elif model_type == "ProxyLessNas":
         if load_weights:
             model = ProxyLessNas(in_channel, num_gesture).to(device)
@@ -272,35 +318,25 @@ def initialize_model(model_type, in_channel, num_gesture, device,
 
 
 
-def run_last_fine_tuning(path, session, subject, num_repetitions, input_type, training_type, 
-           num_gesture, model_type, epochs, save_path, load_path, seed):
+def run_fine_tune(path, session, subject, input_type, num_gesture,
+                num_repetitions, window_time, overlap, training_type, 
+                model_type, epochs, save_path, load_path, seed):
     
 
 
     # Hyperparameters
-    record_time = 5
-    fs = 250
-    no_channel = 8
-    low_cut = 10.0
-    high_cut = 120.0
-    notch_freq = 60.0
-    overlap = 70
-    window_time = 160
-    order = 5
-    activate_session = True
     batch_size = 32
     learning_rate = 0.001
-    selected_gesture = [1, 2, 3, 4, 5, 6, 7]
     criterion = nn.CrossEntropyLoss()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    set_random_seed()
+    set_random_seed(seed)
 
        # Data preparation
-    X_train, y_train, X_test, y_test = prepare_data(
-        path, session, subject, num_repetitions, training_type, num_gesture, selected_gesture,
-        record_time, fs, notch_freq, low_cut, high_cut, order, window_time, overlap, no_channel, activate_session
-    )
+    X_train, y_train, X_test, y_test = prepare_data(path, session, subject,
+                                                    num_gesture, num_repetitions,
+                                                    training_type,  window_time,
+                                                    overlap)
 
     X_train, X_test = process_input_data(input_type, X_train, X_test)
     print(f"Train data shape: {X_train.shape}, Train labels shape: {y_train.shape}")
@@ -317,10 +353,8 @@ def run_last_fine_tuning(path, session, subject, num_repetitions, input_type, tr
     in_channel = X_train.shape[1]
 
     ####### None #########################################################
-    model = initialize_model(model_type, in_channel, num_gesture, device, 
-                                    load_weights=True, weights_path=load_path,
-                                    session=session, subject=subject, 
-                                    input_type=input_type, training_type=training_type)
+    model = initialize_model(model_type, input_type, training_type,in_channel,
+                            num_gesture, device, load_weights=True, weights_path=load_path)
 
     print(f"Without Fine-Tunning")
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
@@ -328,10 +362,9 @@ def run_last_fine_tuning(path, session, subject, num_repetitions, input_type, tr
     ################################################################################
 
     ####### Full-Train #########################################################
-    model = initialize_model(model_type, in_channel, num_gesture, device, 
-                                    load_weights=True, weights_path=load_path,
-                                    session=session, subject=subject, 
-                                    input_type=input_type, training_type=training_type)
+    model = initialize_model(model_type, input_type, training_type,in_channel,
+                            num_gesture, device, load_weights=True, weights_path=load_path)
+    
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     for epoch in tqdm(range(epochs)):
@@ -343,10 +376,8 @@ def run_last_fine_tuning(path, session, subject, num_repetitions, input_type, tr
     ################################################################################
 
     ####### TinyTL ######
-    model = initialize_model(model_type, in_channel, num_gesture, device, 
-                                    load_weights=True, weights_path=load_path,
-                                    session=session, subject=subject, 
-                                    input_type=input_type, training_type=training_type)
+    model = initialize_model(model_type, input_type, training_type,in_channel,
+                            num_gesture, device, load_weights=True, weights_path=load_path)
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     for name, param in model.named_parameters():
@@ -367,10 +398,8 @@ def run_last_fine_tuning(path, session, subject, num_repetitions, input_type, tr
     ################################################################################
 
     ####### Adaptive Edge Update ######
-    model = initialize_model(model_type, in_channel, num_gesture, device, 
-                                    load_weights=True, weights_path=load_path,
-                                    session=session, subject=subject, 
-                                    input_type=input_type, training_type=training_type)
+    model = initialize_model(model_type, input_type, training_type,in_channel,
+                            num_gesture, device, load_weights=True, weights_path=load_path)
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     last_layer = str(list(model.named_children())[-1][0])
     print(f"Last Layer: {last_layer}")
@@ -396,7 +425,7 @@ def run_last_fine_tuning(path, session, subject, num_repetitions, input_type, tr
     os.makedirs(save_path, exist_ok=True)
     save_dir = os.path.join(
         save_path,
-        f"Fine_Tuned_{model_type}_Input_{input_type}_Train_Type_{training_type}.pth"
+        f"FineTuned_{model_type}_Input_{input_type}_Train_Type_{training_type}.pth"
     )
 
     torch.save(model.state_dict(), save_dir)
@@ -411,10 +440,12 @@ def main():
     parser.add_argument("--path", type=str, default='/mnt/d/AI-Workspace/sEMGClassification/AdaptiveModel/data/6_Flex_BMIS/flex_bmis/mat_data', required=True, help="Path to the dataset.")
     parser.add_argument("--session", type=int, default=1, help="Select one of four sessions.")
     parser.add_argument("--subject", type=int, default=1, help="Select subject.")
-    parser.add_argument("--num_repetitions", type=int, default=9, help="Number of repetitions.")
     parser.add_argument("--input_type", type=str, default='raw', required=True, help="Choose 'raw', 'stft', or 'cwt'.")
-    parser.add_argument("--training_type", type=str, default='tsts', required=True, help="Choose 'TSTS' or 'LRO'.")
     parser.add_argument("--num_gesture", type=int, default=7, help="Number of gestures.")
+    parser.add_argument("--num_repetitions", type=int, default=9, help="Number of repetitions.")   
+    parser.add_argument("--window_time", type=int, default=200, help="Window time in milliseconds.")
+    parser.add_argument("--overlap", type=int, default=70, help="Overlap percentage.")  
+    parser.add_argument("--training_type", type=str, default='tsts', required=True, help="Choose 'TSTS' or 'LRO'.")
     parser.add_argument("--model_type", type=str, default="EMGNet", help="Model name.")
     parser.add_argument("--epochs", type=int, default=50, help="Number of epochs.")
     parser.add_argument("--save_path", type=str, default="/mnt/d/AI-Workspace/sEMGClassification/EdgeLastTrain/model_weights", help="Path to save the model.")
@@ -423,10 +454,10 @@ def main():
     args = parser.parse_args()
 
 
-    run_last_fine_tuning(
-        args.path, args.session, args.subject, args.num_repetitions, args.input_type,
-        args.training_type, args.num_gesture, args.model_type, args.epochs, 
-        args.save_path, args.load_path, args.seed)
+    run_fine_tune(args.path, args.session, args.subject, args.input_type,
+                    args.num_gesture, args.num_repetitions, args.window_time,
+                    args.overlap, args.training_type, args.model_type, args.epochs, 
+                    args.save_path, args.load_path, args.seed)
 
 
 if __name__ == "__main__":
