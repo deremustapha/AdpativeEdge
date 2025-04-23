@@ -52,9 +52,10 @@ def train_knowledge_distillation(teacher, student, train_loader, epochs, learnin
                 teacher_logits = teacher(inputs)
 
             # Forward pass with the student model
+            student.train() # Student to train mode
             student_logits = student(inputs)
 
-            #Soften the student logits by applying softmax first and log() second
+            # Soften the student logits by applying softmax first and log() second
             soft_targets = nn.functional.softmax(teacher_logits / T, dim=-1)
             soft_prob = nn.functional.log_softmax(student_logits / T, dim=-1)
 
@@ -72,7 +73,24 @@ def train_knowledge_distillation(teacher, student, train_loader, epochs, learnin
 
             running_loss += loss.item()
 
-        #print(f"Epoch {epoch+1}/{epochs}, Loss: {running_loss / len(train_loader)}")
+        student.eval()
+        correct = 0
+        total = 0
+
+        with torch.no_grad():
+            for inputs, labels in train_loader:
+                inputs, labels = inputs.float().to(device), labels.long().to(device)
+
+                outputs = student(inputs)
+                _, predicted = torch.max(outputs.data, 1)
+
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+
+        train_accuracy = 100 * correct / total
+
+
+        print(f"Epoch {epoch+1}/{epochs}, Train Accuracy: {train_accuracy:.2f}%")
     
 
 def test(model, test_loader, device):
