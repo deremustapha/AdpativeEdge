@@ -46,21 +46,29 @@ def fine_tune_loop(model, train_device, data, loss_fn, optimizer):
     for X, y in data:
 
 
-            optimizer.zero_grad()
+        optimizer.zero_grad()
+        X = X.float().to(train_device)
+        y = y.long().to(train_device)
+        model = model.to(train_device)
 
-            X = X.float().to(train_device)
-            y = y.long().to(train_device)
-            model = model.to(train_device)
+        y_pred = model(X)
+        loss = loss_fn(y_pred, y)
+        loss.backward()
 
-            y_pred = model(X)
-            loss = loss_fn(y_pred, y)
-            loss.backward()
-            optimizer.step()
-            #scheduler.step()
+        for p in list(model.parameters()):
+            if hasattr(p, 'org'):
+                p.data.copy_(p.org) # rest
 
-            train_loss += loss.item()
-            total += y.size(0)
-            correct += (y_pred.argmax(1) == y).sum().item()
+        optimizer.step()
+
+        for p in list(model.parameters()):
+            if hasattr(p, 'org'):
+                p.org.copy_(p.data.clamp_(-1, 1))
+
+
+        train_loss += loss.item()
+        total += y.size(0)
+        correct += (y_pred.argmax(1) == y).sum().item()
 
 
     return train_loss / total, correct / total
@@ -242,22 +250,34 @@ def initialize_model(model_type, input_type, training_type,
     Returns:
         torch.nn.Module: Initialized model.
     """
+    load_weights = True
     load_path = f"KD_{model_type}_Input_{input_type}_Train_Type_{training_type}.pth"
     weights_path = os.path.join(weights_path, load_path)
+    model_type = model_type+"Quantized"
     if model_type == "EMGNet":
         if load_weights:
             model = EMGNet(in_channel, num_gesture).to(device)
             model.load_state_dict(torch.load(weights_path))
-            print(f"Loaded weights from {weights_path}")
+            # print(f"Loaded weights from {weights_path}")
             return model
         else:
             print("Loading default weights")
             return EMGNet(in_channel, num_gesture).to(device)
+    
+    elif model_type == "EMGNetQuantized":
+        if load_weights:
+            model = EMGNetQuantized(in_channel, num_gesture).to(device)
+            model.load_state_dict(torch.load(weights_path))
+            # print(f"Loaded weights from {weights_path}")
+            return model
+        else:
+            print("Loading default weights")
+            return EMGNetQuantized(in_channel, num_gesture).to(device)
     elif model_type == "EMGNetFAN":
         if load_weights:
             model = EMGNetFAN(in_channel, num_gesture).to(device)
             model.load_state_dict(torch.load(weights_path))
-            print(f"Loaded weights from {weights_path}")
+            # print(f"Loaded weights from {weights_path}")
             return model
         else:
             print("Loading default weights")
@@ -266,20 +286,38 @@ def initialize_model(model_type, input_type, training_type,
         if load_weights:
             model = EMGNas(in_channel, num_gesture).to(device)
             model.load_state_dict(torch.load(weights_path))
-            print(f"Loaded weights from {weights_path}")
+            # print(f"Loaded weights from {weights_path}")
             return model
         else:
             print("Loading default weights")
             return EMGNas(in_channel, num_gesture).to(device)
+    elif model_type == "EMGNasQuantized":
+        if load_weights:
+            model = EMGNasQuantized(in_channel, num_gesture).to(device)
+            model.load_state_dict(torch.load(weights_path))
+            # print(f"Loaded weights from {weights_path}")
+            return model
+        else:
+            print("Loading default weights")
+            return EMGNasQuantized(in_channel, num_gesture).to(device)
     elif model_type == "EMGNasFAN":
         if load_weights:
             model = EMGNasFAN(in_channel, num_gesture).to(device)
             model.load_state_dict(torch.load(weights_path))
-            print(f"Loaded weights from {weights_path}")
+            # print(f"Loaded weights from {weights_path}")
             return model
         else:
             print("Loading default weights")
             return EMGNasFAN(in_channel, num_gesture).to(device)
+    elif model_type == "EMGNasFANQuantized":
+        if load_weights:
+            model = EMGNasFANQuantized(in_channel, num_gesture).to(device)
+            model.load_state_dict(torch.load(weights_path))
+            # print(f"Loaded weights from {weights_path}")
+            return model
+        else:
+            print("Loading default weights")
+            return EMGNasFANQuantized(in_channel, num_gesture).to(device)
     elif model_type == "MCUNet":
         def MCUNet(input_channel, number_gestures):
             mcunet, _, _ = build_model(net_id="mcunet-in3", pretrained=True)
@@ -289,7 +327,7 @@ def initialize_model(model_type, input_type, training_type,
         if load_weights:
             model = MCUNet(in_channel, num_gesture).to(device)
             model.load_state_dict(torch.load(weights_path))
-            print(f"Loaded weights from {weights_path}")
+            # print(f"Loaded weights from {weights_path}")
             return model
         else:
             print("Loading default weights")
@@ -298,7 +336,7 @@ def initialize_model(model_type, input_type, training_type,
         if load_weights:
             model = MobileNet(in_channel, num_gesture).to(device)
             model.load_state_dict(torch.load(weights_path))
-            print(f"Loaded weights from {weights_path}")
+            # print(f"Loaded weights from {weights_path}")
             return model
         else:
             print("Loading default weights")
@@ -307,7 +345,7 @@ def initialize_model(model_type, input_type, training_type,
         if load_weights:
             model = ProxyLessNas(in_channel, num_gesture).to(device)
             model.load_state_dict(torch.load(weights_path))
-            print(f"Loaded weights from {weights_path}")
+            # print(f"Loaded weights from {weights_path}")
             return model
         else:
             print("Loading default weights")
@@ -355,10 +393,11 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
     ####### None #########################################################
     model = initialize_model(model_type, input_type, training_type,in_channel,
                             num_gesture, device, load_weights=True, weights_path=load_path)
-
+    print('##########################################################')
     print(f"Without Fine-Tunning")
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
-    print(f'Test accuracy {test_acc*100:.4f}%')
+    print(f'Test accuracy without Fine-Tune {test_acc*100:.4f}%')
+    print('##########################################################')
     ################################################################################
 
     ####### Full-Train #########################################################
@@ -367,12 +406,14 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
     
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
+    print('##########################################################')
     for epoch in tqdm(range(epochs)):
         train_loss, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
     
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
     print(f"Full Layer Fine-Tunning")
     print(f'Test Accuracy Full-Train: {test_acc*100:.4f}%')
+    print('##########################################################')
     ################################################################################
 
     ####### TinyTL ######
@@ -387,6 +428,7 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
         elif 'bias' in name:
             param.requires_grad = True # Unfreeze the bias
     
+    print('##########################################################')
     for epoch in tqdm(range(epochs)):
     
         _, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
@@ -394,7 +436,7 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
     print(f"TinyTL  Train Fine-Tunning")
     print(f'Test Accuracy TinyTL: {test_acc*100:.4f}%')
-    
+    print('##########################################################')
     ################################################################################
 
     ####### Adaptive Edge Update ######
@@ -402,7 +444,7 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
                             num_gesture, device, load_weights=True, weights_path=load_path)
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     last_layer = str(list(model.named_children())[-1][0])
-    print(f"Last Layer: {last_layer}")
+    # print(f"Last Layer: {last_layer}")
 
     for name, param in model.named_parameters():
         # print("Name: ", name)
@@ -412,6 +454,7 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
         else:
             param.requires_grad = False
     
+    print('##########################################################')
     for epoch in tqdm(range(epochs)):
     
         _, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
@@ -419,6 +462,7 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
     print(f"Adaptive Edge Last  Train Fine-Tunning")
     print(f'Test Accuracy Last-Train: {test_acc*100:.4f}%')
+    print('##########################################################')
     ################################################################################
 
     # Save the student model
@@ -429,7 +473,7 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
     )
 
     torch.save(model.state_dict(), save_dir)
-    print(f"Model saved to {save_dir}")
+    #print(f"Model saved to {save_dir}")
 
 
 def main():

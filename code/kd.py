@@ -35,8 +35,8 @@ def set_random_seed(seed=42):
 
 def train_knowledge_distillation(teacher, student, train_loader, epochs, learning_rate, T, soft_target_loss_weight, ce_loss_weight, device):
     ce_loss = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(student.parameters(), lr=learning_rate)
-
+    optimizer = optim.AdamW(student.parameters(), lr=learning_rate)
+    
     teacher.eval()  # Teacher set to evaluation mode
     student.train() # Student to train mode
 

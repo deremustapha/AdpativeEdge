@@ -48,7 +48,51 @@ class FANLayer(nn.Module):
         
         return output
     
+def binarize(tensor):
+    return tensor.sign()
 
+class BinarizeLinear(nn.Linear):
+    def __init__(self, in_features, out_features):
+        super(BinarizeLinear, self).__init__(in_features, out_features)
+
+    def forward(self, input):
+        # input * weight
+        
+        # binarize input
+        input.data = binarize(input.data) # Binarize the tensor
+
+        # binarize weight
+        if not hasattr(self.weight, 'org'):
+            self.weight.org = self.weight.data.clone()
+            
+        self.weight.data = binarize(self.weight.org)
+
+        res = nn.functional.linear(input, self.weight)
+
+        return res
+
+
+class BinarizeConv(nn.Conv2d):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1,
+                 padding=0, dilation=1, groups=1, bias=True):
+        super(BinarizeConv, self).__init__(in_channels, out_channels, kernel_size, stride,
+                                           padding, dilation, groups, bias)
+
+    def forward(self, input):
+        # input * weight
+        
+        # binarize input
+        input.data = binarize(input.data) # Binarize the tensor
+
+        # binarize weight
+        if not hasattr(self.weight, 'org'):
+            self.weight.org = self.weight.data.clone()
+            
+        self.weight.data = binarize(self.weight.org)
+
+        res = nn.functional.conv2d(input, self.weight)
+
+        return res
 
 # Define the EMGNet model
 class EMGNet(nn.Module):
@@ -75,6 +119,41 @@ class EMGNet(nn.Module):
         x = self.flatten(x)
         x = self.fc1(x)
         x = self.relu4(x)
+        x = self.last(x)
+        return x
+
+
+# Define the 1 bit Quantized EMGNet model
+class EMGNetQuantized(nn.Module):
+    def __init__(self, in_channel, num_gesture):
+        super(EMGNetQuantized, self).__init__()
+        self.initial = nn.Conv2d(in_channel, 32, kernel_size=3)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.relu1 = nn.Hardtanh()
+        self.conv2 = BinarizeConv(32, 32, kernel_size=3)
+        self.bn2 = nn.BatchNorm2d(32)
+        self.relu2 = nn.Hardtanh()
+        self.maxpool2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
+        self.dropout = nn.Dropout(0.5)
+        self.flatten = nn.Flatten()
+        self.fc1 = BinarizeLinear(1152, 516) # raw 1152 # stft 512
+        self.bn3 = nn.BatchNorm2d(516)
+        self.relu3 = nn.Hardtanh()
+        self.last = nn.Linear(516, num_gesture)
+
+    def forward(self, x):
+        x = self.initial(x)
+        x = self.bn1(x)
+        x = self.relu1(x)
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = self.relu2(x)
+        x = self.maxpool2(x)
+        x = self.dropout(x)
+        x = self.flatten(x)
+        x = self.fc1(x)
+        x = self.bn3(x)
+        x = self.relu3(x)
         x = self.last(x)
         return x
 
@@ -108,6 +187,35 @@ class EMGNetFAN(nn.Module):
         return x
 
 
+class EMGNetFAN(nn.Module):
+    def __init__(self, in_channel, num_gesture):
+        super(EMGNetFAN, self).__init__()
+        similarparameter=False
+        self.similarparameter = similarparameter
+        self.initial = nn.Conv2d(in_channel, 32, kernel_size=3)
+        self.relu1 = nn.ReLU()
+        self.conv2 = nn.Conv2d(32, 32, kernel_size=3)
+        self.relu2 = nn.ReLU()
+        self.maxpool2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
+        self.dropout = nn.Dropout(0.5)
+        self.flatten = nn.Flatten()
+        self.scalar = lambda x: x*4//3 if self.similarparameter else x
+        self.fc1 = FANLayer(1152, self.scalar(256))  # raw 1152 # stft 512
+        self.last = nn.Linear(256, num_gesture)
+
+    def forward(self, x):
+        x = self.initial(x)
+        x = self.relu1(x)
+        x = self.conv2(x)
+        x = self.relu2(x)
+        x = self.maxpool2(x)
+        x = self.dropout(x)
+        x = self.flatten(x)
+        x = self.fc1(x)
+        x = self.last(x)
+        return x
+    
+
 
 class EMGNas(nn.Module):
     def __init__(self, in_channel, num_gesture):
@@ -127,6 +235,42 @@ class EMGNas(nn.Module):
         self.flatten = nn.Flatten()
         self.fc1 = nn.Linear(9, 13) #1280,40
         self.relu3 = nn.ReLU()
+        self.last = nn.Linear(13, self.num_gesture)
+    
+    def forward(self, x):
+        x = self.initial(x)
+        x = self.relu1(x)
+        x = self.maxpool1(x)
+        x = self.conv2(x)
+        x = self.relu2(x)
+        x = self.maxpool2(x)
+        x = self.globalpool(x)
+        x = self.flatten(x)
+        x = self.fc1(x)
+        x = self.relu3(x)
+        x = self.last(x)
+        return x
+    
+
+
+class EMGNasQuantized(nn.Module):
+    def __init__(self, in_channel, num_gesture):
+        super(EMGNasQuantized, self).__init__()
+        similarparameter=False
+        self.similarparameter = similarparameter
+
+        self.num_gesture = num_gesture
+
+        self.initial = nn.Conv2d(in_channel, 6, kernel_size=3, stride=1, padding=1)
+        self.relu1 = nn.Hardtanh()
+        self.maxpool1 = nn.MaxPool2d(kernel_size=(2, 2))
+        self.conv2 = BinarizeConv(6, 9, kernel_size=3, stride=1, padding=1)
+        self.relu2 = nn.Hardtanh()
+        self.maxpool2 = nn.MaxPool2d(kernel_size=(2, 2))
+        self.globalpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.flatten = nn.Flatten()
+        self.fc1 = BinarizeLinear(9, 13)
+        self.relu3 = nn.Hardtanh()
         self.last = nn.Linear(13, self.num_gesture)
     
     def forward(self, x):
@@ -177,22 +321,24 @@ class EMGNasFAN(nn.Module):
         return x
 
 
-class EMGFAN(nn.Module):
-    def __init__(self, in_channel=1, num_gesture=7):
-        super(EMGFAN, self).__init__()
+class EMGNasFANQuantized(nn.Module):
+    def __init__(self, in_channel, num_gesture):
+        super(EMGNasFANQuantized, self).__init__()
         similarparameter=False
         self.similarparameter = similarparameter
+        self.num_gesture = num_gesture
+
         self.initial = nn.Conv2d(in_channel, 6, kernel_size=3, stride=1, padding=1)
-        self.relu1 = nn.ReLU()
+        self.relu1 = nn.Hardtanh()
         self.maxpool1 = nn.MaxPool2d(kernel_size=(2, 2))
         self.conv2 = nn.Conv2d(6, 9, kernel_size=3, stride=1, padding=1)
-        self.relu2 = nn.ReLU()
+        self.relu2 = nn.Hardtanh()
         self.maxpool2 = nn.MaxPool2d(kernel_size=(2, 2))
         self.globalpool = nn.AdaptiveAvgPool2d((1, 1))
         self.flatten = nn.Flatten()
         self.scalar = lambda x: x*4//3 if self.similarparameter else x
-        self.FAN = FANLayer(576, self.scalar(256)) #1152
-        self.last = nn.Linear(256, num_gesture)
+        self.fc1 = FANLayer(9, self.scalar(256))  # raw =180, stft=90
+        self.last = nn.Linear(256, self.num_gesture)
     
     def forward(self, x):
         x = self.initial(x)
@@ -203,108 +349,7 @@ class EMGFAN(nn.Module):
         x = self.maxpool2(x)
         x = self.globalpool(x)
         x = self.flatten(x)
-        x = self.FAN(x)
-        x = self.last(x)
-        return x
-
-
-
-
-def binarize(tensor):
-    return tensor.sign()
-
-class BinarizeLinear(nn.Linear):
-    def __init__(self, in_features, out_features):
-        super(BinarizeLinear, self).__init__(in_features, out_features)
-
-    def forward(self, input):
-        # input * weight
-        
-        # binarize input
-        input.data = binarize(input.data) # Binarize the tensor
-
-        # binarize weight
-        if not hasattr(self.weight, 'org'):
-            self.weight.org = self.weight.data.clone()
-            
-        self.weight.data = binarize(self.weight.org)
-
-        res = nn.functional.linear(input, self.weight)
-
-        return res
-
-
-class BinarizeConv(nn.Conv2d):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, dilation=1, groups=1, bias=True):
-        super(BinarizeConv, self).__init__(in_channels, out_channels, kernel_size, stride,
-                                           padding, dilation, groups, bias)
-
-    def forward(self, input):
-        # input * weight
-        
-        # binarize input
-        input.data = binarize(input.data) # Binarize the tensor
-
-        # binarize weight
-        if not hasattr(self.weight, 'org'):
-            self.weight.org = self.weight.data.clone()
-            
-        self.weight.data = binarize(self.weight.org)
-
-        res = nn.functional.conv2d(input, self.weight)
-
-        return res
-
-
-
-class EMGFANNew(nn.Module):
-    def __init__(self, input_dim=1, output_dim=7, similarparameter=False):
-        super(EMGFANNew, self).__init__()
-        self.similarparameter = similarparameter
-        self.out_gesture = output_dim
-        self.in_channel = input_dim
-
-        self.first = nn.Conv2d(self.in_channel, 32, kernel_size=3)
-        self.bn1 = nn.BatchNorm2d(32)
-        #self.htanh1 = nn.ReLU()
-        self.htanh1 = nn.Hardtanh()
-        #self.conv2 = nn.Conv2d(32, 32, kernel_size=3)
-
-        self.conv2 = nn.Conv2d(32, 32, kernel_size=3)
-        self.bn2 = nn.BatchNorm2d(32)
-        #self.htanh2 = nn.ReLU()
-        self.htanh2 = nn.Hardtanh()
-
-        # self.conv3 = nn.Conv2d(32, 32, kernel_size=1)
-        # self.bn = nn.BatchNorm2d(32)
-        # self.act = nn.ReLU()
-
-        self.maxpool2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
-        self.dropout = nn.Dropout(0.5)
-        self.flatten = nn.Flatten()
-
-        self.scalar = lambda x: x*4//3 if self.similarparameter else x
-        self.FAN = FANLayer(576, self.scalar(256))
-        self.bn3 = nn.BatchNorm1d(256)
-        #self.htanh3 = nn.ReLU()
-        self.htanh3 = nn.Hardtanh()
-
-        self.last = nn.Linear(256, self.out_gesture)
-    
-    def forward(self, x):
-        x = self.first(x)
-        x = self.bn1(x)
-        x = self.htanh1(x)
-        x = self.conv2(x)
-        x = self.bn2(x)
-        x = self.htanh2(x)
-        x = self.maxpool2(x)
-        x = self.dropout(x)
-        x = self.flatten(x)
-        x = self.FAN(x)
-        x = self.bn3(x)
-        x = self.htanh3(x)
+        x = self.fc1(x)
         x = self.last(x)
         return x
 
