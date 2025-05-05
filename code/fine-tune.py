@@ -245,7 +245,7 @@ def initialize_model(model_type, input_type, training_type,
     Returns:
         torch.nn.Module: Initialized model.
     """
-    load_path = f"KD_{model_type}_Input_{input_type}_Train_Type_{training_type}.pth"
+    load_path = f"MetaLearn_{model_type}_Input_{input_type}_Train_Type_{training_type}.pth"
     weights_path = os.path.join(weights_path, load_path)
     if model_type == "EMGNet":
         if load_weights:
@@ -328,11 +328,11 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
 
 
     # Hyperparameters
-    batch_size = 8
+    batch_size = 128
     learning_rate = 0.001
     criterion = nn.CrossEntropyLoss()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    load_weights = True
+    load_weights = False
 
     set_random_seed(seed)
 
@@ -363,7 +363,7 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
     print('##########################################################')
     print(f"Without Fine-Tunning")
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
-    print(f'Test accuracy {test_acc*100:.4f}%')
+    print(f'Test accuracy {test_acc*100:.2f}%')
     print('##########################################################')
     ################################################################################
 
@@ -381,13 +381,13 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
     
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
     print(f"Full Layer Fine-Tunning")
-    print(f'Test Accuracy Full-Train: {test_acc*100:.4f}%')
+    print(f'Test Accuracy Full-Train: {test_acc*100:.2f}%')
     print('##########################################################')
     ################################################################################
 
     ####### TinyTL ######
     model = initialize_model(model_type, input_type, training_type,in_channel,
-                            num_gesture, device, load_weights=True, weights_path=load_path)
+                            num_gesture, device, load_weights=load_weights, weights_path=load_path)
     #optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=1e-4)
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
 
@@ -405,13 +405,13 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
 
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
     print(f"TinyTL  Train Fine-Tunning")
-    print(f'Test Accuracy TinyTL: {test_acc*100:.4f}%')
+    print(f'Test Accuracy TinyTL: {test_acc*100:.2f}%')
     print('##########################################################')
     ################################################################################
 
     ####### Adaptive Edge Update ######
     model = initialize_model(model_type, input_type, training_type,in_channel,
-                            num_gesture, device, load_weights=True, weights_path=load_path)
+                            num_gesture, device, load_weights=load_weights, weights_path=load_path)
     
     #optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=1e-4)
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
@@ -438,7 +438,7 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
 
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
     print(f"Adaptive Edge Last  Train Fine-Tunning")
-    print(f'Test Accuracy Last-Train: {test_acc*100:.4f}%')
+    print(f'Test Accuracy Last-Train: {test_acc*100:.2f}%')
     print('##########################################################')
     ################################################################################
 

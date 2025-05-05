@@ -438,3 +438,4 @@ class CTRLEMG(nn.Module):
 # model = GestureRecognitionModel(input_dim=128, num_gestures=9)
 # input_tensor = torch.randn(32, 128)  # Batch size of 32, input dimension of 128
 # output = model(input_tensor)
+# python fine-tune_1_bit.py --path "/mnt/d/AI-Workspace/sEMGClassification/EdgeLastTrain/data/6_Flex_BMIS/flex_bmis/mat_data" --session 1 --subject 7 --input "raw" --num_gesture 7 --num_repetitions 9 --window_time 160 --overlap 70 --training_type tsts --model_type ProxyLessNas --epochs 30 --save_path "/mnt/d/AI-Workspace/sEMGClassification/EdgeLastTrain/model_weights/FineTune/WithPre_Train" --load_path "/mnt/d/AI-Workspace/sEMGClassification/EdgeLastTrain/model_weights/PreTrain"
