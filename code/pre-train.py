@@ -213,7 +213,7 @@ def run_pretrain(path, input_type, num_gesture, window_time, overlap, model_type
     """
     # Hyperparameters
 
-    batch_size = 32
+    batch_size = 128
     learning_rate = 0.001
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

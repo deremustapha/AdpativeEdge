@@ -252,7 +252,7 @@ def process_input_data(input_type, X_train, X_test):
     return X_train, X_test
 
 
-def initialize_model(model_type, input_type, in_channel, num_gesture, 
+def initialize_model(model_type, input_type, training_type, in_channel, num_gesture, 
                      device, load_weights, weights_path):
     """
     Initialize the model based on the model type.
@@ -266,7 +266,7 @@ def initialize_model(model_type, input_type, in_channel, num_gesture,
     Returns:
         torch.nn.Module: Initialized model.
     """
-    load_path = f"MetaLearn_{model_type}_Input_{input_type}.pth"
+    load_path = f"MetaLearn_{model_type}_Input_{input_type}_Train_Type_{training_type}.pth"
     weights_path = os.path.join(weights_path, load_path)
     if model_type == "EMGNet":
         if load_weights:
@@ -378,7 +378,7 @@ def run_kd(path, session, subject, input_type, num_gesture,
     """
 
     # Hyperparameters
-    batch_size = 32
+    batch_size = 128
     learning_rate = 0.001
     T=3
     soft_target_loss_weight=0.25
@@ -413,13 +413,13 @@ def run_kd(path, session, subject, input_type, num_gesture,
     in_channel = X_train.shape[1]
     set_random_seed(seed)
     teacher_model_type = 'MCUNet'
-    teacher_model = initialize_model(teacher_model_type, input_type, in_channel,
+    teacher_model = initialize_model(teacher_model_type, input_type, training_type, in_channel,
                                     num_gesture, device, load_weights=True, 
                                     weights_path=load_path)
     print(f"Teacher Model Loaded")
 
     set_random_seed(seed)
-    student_model = initialize_model(model_type, input_type, in_channel,
+    student_model = initialize_model(model_type, input_type, training_type, in_channel,
                                     num_gesture, device, load_weights=True, 
                                     weights_path=load_path)
     print(f"Student Model Loaded")

@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.models import mobilenet_v3_small
+from torchvision.models import mobilenet_v2
+from torchvision.models import MobileNet_V2_Weights
 
 
 
@@ -355,9 +356,11 @@ class EMGNasFANQuantized(nn.Module):
 
 
 def MobileNet(input_channel, number_gestures):
-    model = mobilenet_v3_small(pretrained=True)
-    model.features[0][0] = nn.Conv2d(input_channel, 16, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
-    model.classifier[3] = nn.Linear(in_features=1024, out_features=number_gestures, bias=True)
+    
+    weights = MobileNet_V2_Weights.DEFAULT
+    model = mobilenet_v2(weights)
+    model.features[0][0] = nn.Conv2d(input_channel, 32, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=True)
+    model.classifier[1] = nn.Linear(in_features=1280, out_features=number_gestures, bias=True)
     return model
 
 

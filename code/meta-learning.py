@@ -260,7 +260,7 @@ def initialize_model(model_type, input_type, in_channel, num_gesture,
     Returns:
         torch.nn.Module: Initialized model.
     """
-    load_path = f"PreTrain_{model_type}_Input_{input_type}.pth"
+    load_path = f"PreTrain_{model_type}_Input_{input_type}_Train_Type_tsts.pth"
     weights_path = os.path.join(weights_path, load_path)
     if model_type == "EMGNet":
         if load_weights:
@@ -402,7 +402,7 @@ def run_meta_learning(path, session, start_subject, stop_subject,
     save_dir = os.path.join(
         save_path,
         #f"MetaLearn_{model_type}_Session_{session}_Subject_{start_subject}_Input_{input_type}_Train_type_{training_type}.pth"
-        f"MetaLearn_{model_type}_Input_{input_type}.pth"
+        f"MetaLearn_{model_type}_Input_{input_type}_Train_Type_tsts.pth"
     )
 
     torch.save(model.state_dict(), save_dir)
