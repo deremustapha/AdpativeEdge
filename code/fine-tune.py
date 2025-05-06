@@ -246,7 +246,7 @@ def initialize_model(model_type, input_type, training_type,
     Returns:
         torch.nn.Module: Initialized model.
     """
-    load_path = f"PreTrain_{model_type}_Input_{input_type}_Train_Type_{training_type}.pth"
+    load_path = f"KD_{model_type}_Input_{input_type}_Train_Type_{training_type}.pth"
     weights_path = os.path.join(weights_path, load_path)
     if model_type == "EMGNet":
         if load_weights:
@@ -329,7 +329,7 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
 
 
     # Hyperparameters
-    batch_size = 128
+    batch_size = 1
     learning_rate = 0.001
     criterion = nn.CrossEntropyLoss()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -378,7 +378,14 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
 
     print('##########################################################')
     for epoch in tqdm(range(epochs)):
-        train_loss, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
+        start_time = time()
+        _, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
+        stop_time = time()
+
+        latency = stop_time - start_time
+        all_latency.append(latency)
+
+    print(f'The average latency is {np.mean(all_latency) * 1000:.4f}ms, std {np.std(all_latency) * 1000:.4f}ms')
     
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
     print(f"Full Layer Fine-Tunning")
@@ -409,9 +416,16 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
 
 
     print('##########################################################')
+    all_latency = []
     for epoch in tqdm(range(epochs)):
-    
+        start_time = time()
         _, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
+        stop_time = time()
+
+        latency = stop_time - start_time
+        all_latency.append(latency)
+
+    print(f'The average latency is {np.mean(all_latency) * 1000:.4f}ms, std {np.std(all_latency) * 1000:.4f}ms')
 
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
     print(f"LastLayer Last  Train Fine-Tunning")
@@ -433,9 +447,17 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
             param.requires_grad = True # Unfreeze the bias
 
     print('##########################################################')
+    all_latency = []
     for epoch in tqdm(range(epochs)):
-    
+        
+        start_time = time()
         _, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
+        stop_time = time()
+
+        latency = stop_time - start_time
+        all_latency.append(latency)
+
+    print(f'The average latency is {np.mean(all_latency) * 1000:.4f}ms, std {np.std(all_latency) * 1000:.4f}ms')
 
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
     print(f"TinyTL  Train Fine-Tunning")
@@ -462,9 +484,17 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     #optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=0.01)
     print('##########################################################')
+    all_latency = []
     for epoch in tqdm(range(epochs)):
-    
+        
+        start_time = time()
         _, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
+        stop_time = time()
+
+        latency = stop_time - start_time
+        all_latency.append(latency)
+
+    print(f'The average latency is {np.mean(all_latency) * 1000:.4f}ms, std {np.std(all_latency) * 1000:.4f}ms')
 
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
     print(f"Adaptive Edge Last  Train Fine-Tunning")
