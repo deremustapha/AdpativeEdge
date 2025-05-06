@@ -18,6 +18,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from time import time
+
 from sklearn.metrics import (f1_score, recall_score, 
                              precision_score, top_k_accuracy_score)
 
@@ -244,7 +246,7 @@ def initialize_model(model_type, input_type, training_type,
     Returns:
         torch.nn.Module: Initialized model.
     """
-    load_path = f"KD_{model_type}_Input_{input_type}_Train_Type_{training_type}.pth"
+    load_path = f"PreTrain_{model_type}_Input_{input_type}_Train_Type_{training_type}.pth"
     weights_path = os.path.join(weights_path, load_path)
     if model_type == "EMGNet":
         if load_weights:
@@ -356,92 +358,92 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
     in_channel = X_train.shape[1]
 
     # ###### None #########################################################
-    # model = initialize_model(model_type, input_type, training_type,in_channel,
-    #                         num_gesture, device, load_weights=load_weights, weights_path=load_path)
+    model = initialize_model(model_type, input_type, training_type,in_channel,
+                            num_gesture, device, load_weights=load_weights, weights_path=load_path)
 
-    # print('##########################################################')
-    # print(f"Without Fine-Tunning")
-    # _, test_acc = test_loop(model, device, test_dataloader, criterion)
-    # print(f'Test accuracy {test_acc*100:.2f}%')
-    # print('##########################################################')
-    # ###############################################################################
+    print('##########################################################')
+    print(f"Without Fine-Tunning")
+    _, test_acc = test_loop(model, device, test_dataloader, criterion)
+    print(f'Test accuracy {test_acc*100:.2f}%')
+    print('##########################################################')
+    ###############################################################################
 
-    # ####### Full-Train #########################################################
-    # model = initialize_model(model_type, input_type, training_type,in_channel,
-    #                         num_gesture, device, load_weights=load_weights,
-    #                           weights_path=load_path)
+    ####### Full-Train #########################################################
+    model = initialize_model(model_type, input_type, training_type,in_channel,
+                            num_gesture, device, load_weights=load_weights,
+                              weights_path=load_path)
     
-    # #optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=1e-4)
-    # optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+    #optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=1e-4)
+    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
 
-    # print('##########################################################')
-    # for epoch in tqdm(range(epochs)):
-    #     train_loss, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
+    print('##########################################################')
+    for epoch in tqdm(range(epochs)):
+        train_loss, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
     
-    # _, test_acc = test_loop(model, device, test_dataloader, criterion)
-    # print(f"Full Layer Fine-Tunning")
-    # print(f'Test Accuracy Full-Train: {test_acc*100:.2f}%')
-    # print('##########################################################')
-    # ################################################################################
+    _, test_acc = test_loop(model, device, test_dataloader, criterion)
+    print(f"Full Layer Fine-Tunning")
+    print(f'Test Accuracy Full-Train: {test_acc*100:.2f}%')
+    print('##########################################################')
+    ################################################################################
 
-    # ####### LastLayer Update ######
-    # model = initialize_model(model_type, input_type, training_type,in_channel,
-    #                         num_gesture, device, load_weights=load_weights, weights_path=load_path)
+    ####### LastLayer Update ######
+    model = initialize_model(model_type, input_type, training_type,in_channel,
+                            num_gesture, device, load_weights=load_weights, weights_path=load_path)
     
-    # #optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=1e-4)
-    # optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
-    # last_layer = str(list(model.named_children())[-1][0])
-    # # print(f"Last Layer: {last_layer}")
+    #optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=1e-4)
+    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+    last_layer = str(list(model.named_children())[-1][0])
+    # print(f"Last Layer: {last_layer}")
 
-    # for name, param in model.named_parameters():
-    #     # print("Name: ", name)
-    #     if name.startswith(last_layer):
-    #         param.requires_grad = True
-    #     else:
-    #         param.requires_grad = False
+    for name, param in model.named_parameters():
+        # print("Name: ", name)
+        if name.startswith(last_layer):
+            param.requires_grad = True
+        else:
+            param.requires_grad = False
         
-    #     if 'bias' in name:
-    #         # print(f"Name: {name}, Param: {param.requires_grad}")
-    #         param.requires_grad = True # Unfreeze the bias
-    #         # print(f"Name: {name}, Param: {param.requires_grad}")
+        if 'bias' in name:
+            # print(f"Name: {name}, Param: {param.requires_grad}")
+            param.requires_grad = True # Unfreeze the bias
+            # print(f"Name: {name}, Param: {param.requires_grad}")
 
 
-    # print('##########################################################')
-    # for epoch in tqdm(range(epochs)):
+    print('##########################################################')
+    for epoch in tqdm(range(epochs)):
     
-    #     _, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
+        _, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
 
-    # _, test_acc = test_loop(model, device, test_dataloader, criterion)
-    # print(f"LastLayer Last  Train Fine-Tunning")
-    # print(f'Test Accuracy Last-Train: {test_acc*100:.2f}%')
-    # print('##########################################################')
+    _, test_acc = test_loop(model, device, test_dataloader, criterion)
+    print(f"LastLayer Last  Train Fine-Tunning")
+    print(f'Test Accuracy Last-Train: {test_acc*100:.2f}%')
+    print('##########################################################')
+    ################################################################################
+
+    ####### TinyTL ########################################################
+    model = initialize_model(model_type, input_type, training_type,in_channel,
+                            num_gesture, device, load_weights=load_weights, weights_path=load_path)
+    #optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=1e-4)
+    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+
+    for name, param in model.named_parameters():
+    
+        if 'weight' in name:
+            param.requires_grad = False # Freeze the weights
+        elif 'bias' in name:
+            param.requires_grad = True # Unfreeze the bias
+
+    print('##########################################################')
+    for epoch in tqdm(range(epochs)):
+    
+        _, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
+
+    _, test_acc = test_loop(model, device, test_dataloader, criterion)
+    print(f"TinyTL  Train Fine-Tunning")
+    print(f'Test Accuracy TinyTL: {test_acc*100:.2f}%')
+    print('##########################################################')
     # ################################################################################
 
-    # ####### TinyTL ########################################################
-    # model = initialize_model(model_type, input_type, training_type,in_channel,
-    #                         num_gesture, device, load_weights=load_weights, weights_path=load_path)
-    # #optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=1e-4)
-    # optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
-
-    # for name, param in model.named_parameters():
-    
-    #     if 'weight' in name:
-    #         param.requires_grad = False # Freeze the weights
-    #     elif 'bias' in name:
-    #         param.requires_grad = True # Unfreeze the bias
-
-    # print('##########################################################')
-    # for epoch in tqdm(range(epochs)):
-    
-    #     _, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
-
-    # _, test_acc = test_loop(model, device, test_dataloader, criterion)
-    # print(f"TinyTL  Train Fine-Tunning")
-    # print(f'Test Accuracy TinyTL: {test_acc*100:.2f}%')
-    # print('##########################################################')
-    # # ################################################################################
-
-    ####### Adaptive Edge Update ######################################################
+    ###### Adaptive Edge Update ######################################################
     model = initialize_model(model_type, input_type, training_type,in_channel,
                             num_gesture, device, load_weights=load_weights, weights_path=load_path)
     
