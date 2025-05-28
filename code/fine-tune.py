@@ -140,7 +140,7 @@ def prepare_data(path, session, subject, num_gesture, num_repetitions,
     high_cut=120.0
     notch_freq=60.0
     order=5
-    train_percent=80 
+    train_percent=80
     activate_session = True
     selected_gesture = [1, 2, 3, 4, 5, 6, 7]
 
@@ -246,7 +246,8 @@ def initialize_model(model_type, input_type, training_type,
     Returns:
         torch.nn.Module: Initialized model.
     """
-    load_path = f"KD_{model_type}_Input_{input_type}_Train_Type_{training_type}.pth"
+    # MetaLearn # PreTrain
+    load_path = f"PreTrain_{model_type}_Input_{input_type}_Train_Type_{training_type}.pth"
     weights_path = os.path.join(weights_path, load_path)
     if model_type == "EMGNet":
         if load_weights:
@@ -329,12 +330,12 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
 
 
     # Hyperparameters
-    batch_size = 1
+    batch_size = 256
     learning_rate = 0.001
     criterion = nn.CrossEntropyLoss()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     load_weights = True
-
+    print(f'Participant {subject}')
     set_random_seed(seed)
 
        # Data preparation
@@ -369,14 +370,19 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
     ###############################################################################
 
     ####### Full-Train #########################################################
+    torch.cuda.reset_peak_memory_stats(device)
+    torch.cuda.empty_cache()
+
+    #print(f'Before full train, peak memory usage: {torch.cuda.max_memory_allocated(device) / 1e6:.2f} MB')
     model = initialize_model(model_type, input_type, training_type,in_channel,
                             num_gesture, device, load_weights=load_weights,
                               weights_path=load_path)
     
     #optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=1e-4)
-    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     print('##########################################################')
+    all_latency = []
     for epoch in tqdm(range(epochs)):
         start_time = time()
         _, train_acc = fine_tune_loop(model, device, train_dataloader, criterion, optimizer)
@@ -387,6 +393,9 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
 
     print(f'The average latency is {np.mean(all_latency) * 1000:.4f}ms, std {np.std(all_latency) * 1000:.4f}ms')
     
+    #print(f'After full train, peak memory usage: {torch.cuda.max_memory_allocated(device) / 1e6:.2f} MB')
+    peak_memory = torch.cuda.max_memory_allocated(device)
+    print(f'Peak memory usage: {peak_memory / 1e6:.2f} MB')
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
     print(f"Full Layer Fine-Tunning")
     print(f'Test Accuracy Full-Train: {test_acc*100:.2f}%')
@@ -394,11 +403,14 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
     ################################################################################
 
     ####### LastLayer Update ######
+    torch.cuda.reset_peak_memory_stats(device)
+    torch.cuda.empty_cache()
+
     model = initialize_model(model_type, input_type, training_type,in_channel,
                             num_gesture, device, load_weights=load_weights, weights_path=load_path)
     
     #optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=1e-4)
-    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     last_layer = str(list(model.named_children())[-1][0])
     # print(f"Last Layer: {last_layer}")
 
@@ -427,6 +439,9 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
 
     print(f'The average latency is {np.mean(all_latency) * 1000:.4f}ms, std {np.std(all_latency) * 1000:.4f}ms')
 
+    peak_memory = torch.cuda.max_memory_allocated(device)
+    print(f'Peak memory usage: {peak_memory / 1e6:.2f} MB')
+
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
     print(f"LastLayer Last  Train Fine-Tunning")
     print(f'Test Accuracy Last-Train: {test_acc*100:.2f}%')
@@ -434,10 +449,13 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
     ################################################################################
 
     ####### TinyTL ########################################################
+    torch.cuda.reset_peak_memory_stats(device)
+    torch.cuda.empty_cache()
+
     model = initialize_model(model_type, input_type, training_type,in_channel,
                             num_gesture, device, load_weights=load_weights, weights_path=load_path)
     #optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=1e-4)
-    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     for name, param in model.named_parameters():
     
@@ -458,6 +476,9 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
         all_latency.append(latency)
 
     print(f'The average latency is {np.mean(all_latency) * 1000:.4f}ms, std {np.std(all_latency) * 1000:.4f}ms')
+    
+    peak_memory = torch.cuda.max_memory_allocated(device)
+    print(f'Peak memory usage: {peak_memory / 1e6:.2f} MB')
 
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
     print(f"TinyTL  Train Fine-Tunning")
@@ -466,6 +487,9 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
     # ################################################################################
 
     ###### Adaptive Edge Update ######################################################
+    torch.cuda.reset_peak_memory_stats(device)
+    torch.cuda.empty_cache()
+
     model = initialize_model(model_type, input_type, training_type,in_channel,
                             num_gesture, device, load_weights=load_weights, weights_path=load_path)
     
@@ -475,13 +499,14 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
     grad_var = compute_gradient_variance(model, train_dataloader, criterion, num_batches=batch_size, device=device)
     
     # Step 2: Apply sparse mask (keep top 10% most variable weights)
-    apply_gradient_mask(model, grad_var, sparsity=0.9)
+    apply_gradient_mask(model, grad_var, sparsity=0.1)
     
     # Step 3: Register hooks to enforce masking
     register_gradient_hooks(model)
 
 
-    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+    #optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     #optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=0.01)
     print('##########################################################')
     all_latency = []
@@ -495,14 +520,15 @@ def run_fine_tune(path, session, subject, input_type, num_gesture,
         all_latency.append(latency)
 
     print(f'The average latency is {np.mean(all_latency) * 1000:.4f}ms, std {np.std(all_latency) * 1000:.4f}ms')
-
+    peak_memory = torch.cuda.max_memory_allocated(device)
+    print(f'Peak memory usage: {peak_memory / 1e6:.2f} MB')
     _, test_acc = test_loop(model, device, test_dataloader, criterion)
     print(f"Adaptive Edge Last  Train Fine-Tunning")
     print(f'Test Accuracy Last-Train: {test_acc*100:.2f}%')
     print('##########################################################')
     ################################################################################
 
-    # Save the student model
+
     os.makedirs(save_path, exist_ok=True)
     save_dir = os.path.join(
         save_path,
@@ -518,19 +544,19 @@ def main():
     Main function to parse arguments and run the pretraining process.
     """
     parser = argparse.ArgumentParser(description="Train and evaluate the EMGNet model.")
-    parser.add_argument("--path", type=str, default='/mnt/d/AI-Workspace/sEMGClassification/AdaptiveModel/data/6_Flex_BMIS/flex_bmis/mat_data', required=True, help="Path to the dataset.")
+    parser.add_argument("--path", type=str, default="/mnt/d/AI-Workspace/sEMGClassification/EdgeLastTrain/data/6_Flex_BMIS/flex_bmis/mat_data", help="Path to the dataset.")
     parser.add_argument("--session", type=int, default=1, help="Select one of four sessions.")
-    parser.add_argument("--subject", type=int, default=1, help="Select subject.")
-    parser.add_argument("--input_type", type=str, default='raw', required=True, help="Choose 'raw', 'stft', or 'cwt'.")
+    parser.add_argument("--subject", type=int, default=5, help="Select subject.")
+    parser.add_argument("--input_type", type=str, default="raw", help="Choose 'raw', 'stft', or 'cwt'.")
     parser.add_argument("--num_gesture", type=int, default=7, help="Number of gestures.")
     parser.add_argument("--num_repetitions", type=int, default=9, help="Number of repetitions.")   
-    parser.add_argument("--window_time", type=int, default=200, help="Window time in milliseconds.")
+    parser.add_argument("--window_time", type=int, default=160, help="Window time in milliseconds.")
     parser.add_argument("--overlap", type=int, default=70, help="Overlap percentage.")  
-    parser.add_argument("--training_type", type=str, default='tsts', required=True, help="Choose 'TSTS' or 'LRO'.")
-    parser.add_argument("--model_type", type=str, default="EMGNet", help="Model name.")
-    parser.add_argument("--epochs", type=int, default=50, help="Number of epochs.")
-    parser.add_argument("--save_path", type=str, default="/mnt/d/AI-Workspace/sEMGClassification/EdgeLastTrain/model_weights", help="Path to save the model.")
-    parser.add_argument("--load_path", type=str, default="/mnt/d/AI-Workspace/sEMGClassification/EdgeLastTrain/model_weights", help="Path to save the model.")
+    parser.add_argument("--training_type", type=str, default="tsts", help="Choose 'TSTS' or 'LRO'.")
+    parser.add_argument("--model_type", type=str, default="ProxyLessNas", help="Model name.")
+    parser.add_argument("--epochs", type=int, default=30, help="Number of epochs.")
+    parser.add_argument("--save_path", type=str, default="/mnt/d/AI-Workspace/sEMGClassification/EdgeLastTrain/model_weights/FineTune/KD", help="Path to save the model.")
+    parser.add_argument("--load_path", type=str, default="/mnt/d/AI-Workspace/sEMGClassification/EdgeLastTrain/model_weights/PreTrain", help="Path to save the model.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
     args = parser.parse_args()
 

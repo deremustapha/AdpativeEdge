@@ -157,14 +157,14 @@ def prepare_data(path, session, subject, num_gesture, num_repetitions,
         tuple: Training and testing data and labels.
     """
     record_time=5
-    fs=250
+    fs=200
     no_channel=8
     low_cut = 10.0
-    high_cut=120.0
+    high_cut=99.0
     notch_freq=60.0
     order=5
     train_percent=80 
-    activate_session = True
+    activate_session = False
     selected_gesture = [1, 2, 3, 4, 5, 6, 7]
 
     emg_prep = EMGDataPreparation(base_path=path, fs=fs, rec_time=record_time)
@@ -450,19 +450,19 @@ def main():
     Main function to parse arguments and run the pretraining process.
     """
     parser = argparse.ArgumentParser(description="Train and evaluate the EMGNet model.")
-    parser.add_argument("--path", type=str, default='/mnt/d/AI-Workspace/sEMGClassification/AdaptiveModel/data/6_Flex_BMIS/flex_bmis/mat_data', required=True, help="Path to the dataset.")
+    parser.add_argument("--path", type=str, default='/mnt/d/AI-Workspace/sEMGClassification/EdgeLastTrain/data/2_BMIS/mat_data', help="Path to the dataset.")
     parser.add_argument("--session", type=int, default=1, help="Select one of four sessions.")
-    parser.add_argument("--subject", type=int, default=1, help="Select subject.")
-    parser.add_argument("--input_type", type=str, default='raw', required=True, help="Choose 'raw', 'stft', or 'cwt'.")
+    parser.add_argument("--subject", type=int, default=33, help="Select subject.")
+    parser.add_argument("--input_type", type=str, default='raw', help="Choose 'raw', 'stft', or 'cwt'.")
     parser.add_argument("--num_gesture", type=int, default=7, help="Number of gestures.")
-    parser.add_argument("--num_repetitions", type=int, default=9, help="Number of repetitions.")
+    parser.add_argument("--num_repetitions", type=int, default=6, help="Number of repetitions.")
     parser.add_argument("--window_time", type=int, default=200, help="Window time in milliseconds.")
     parser.add_argument("--overlap", type=int, default=70, help="Overlap percentage.")
-    parser.add_argument("--training_type", type=str, default='tsts', required=True, help="Choose 'TSTS' or 'LRO'.")
-    parser.add_argument("--model_type", type=str, default="EMGNet", help="Model name.")
+    parser.add_argument("--training_type", type=str, default='tsts', help="Choose 'TSTS' or 'LRO'.")
+    parser.add_argument("--model_type", type=str, default="MobileNet", help="Model name.")
     parser.add_argument("--epochs", type=int, default=50, help="Number of epochs.")
-    parser.add_argument("--save_path", type=str, default="/mnt/d/AI-Workspace/sEMGClassification/EdgeLastTrain/model_weights", help="Path to save the model.")
-    parser.add_argument("--load_path", type=str, default="/mnt/d/AI-Workspace/sEMGClassification/EdgeLastTrain/model_weights", help="Path to save the model.")
+    parser.add_argument("--save_path", type=str, default="/mnt/d/AI-Workspace/sEMGClassification/EdgeLastTrain/model_weights/KD2", help="Path to save the model.")
+    parser.add_argument("--load_path", type=str, default="/mnt/d/AI-Workspace/sEMGClassification/EdgeLastTrain/model_weights/MetaLearn", help="Path to save the model.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
     args = parser.parse_args()
 
