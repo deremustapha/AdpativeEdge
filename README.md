@@ -65,5 +65,5 @@ Typically, the pre-trained models need to be depolyed on an Ultra96-V2 FPGA for 
 
 4. [AdaptiveEdge](#step):
    ```bash
-   fine-tune.py
+   python3 fine-tune.py
 
