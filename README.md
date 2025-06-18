@@ -35,8 +35,8 @@
 
 <h2 id="dataset">📊 Dataset</h2>
 
-- The Myodataset used for offline pre-training can be downloaded from [GitHub](https://github.com/UlysseCoteAllard/MyoArmbandDataset).
+- The Myo Armband dataset used for offline pre-training can be accessed from [GitHub](https://github.com/UlysseCoteAllard/MyoArmbandDataset).
 
-- The dataset used for meta-learning can be downloaded from [IEEEPort](https://ieee-dataport.org/documents/emg-eeg-dataset-upper-limb-gesture-classification).
+- The dataset utilized for meta-learning can be downloaded from [IEEE DataPort](https://ieee-dataport.org/documents/emg-eeg-dataset-upper-limb-gesture-classification).
 
-- FlexAdapt dataset utilized for knowledge distillation and on-device fine-tuning can be gotten on [HuggingFace](https://huggingface.co/datasets/deremustapha/FlexAdapt_EMG_Dataset)
+- The FlexAdapt dataset, which is used for knowledge distillation and on-device fine-tuning, can be accessed from [HuggingFace](https://huggingface.co/datasets/deremustapha/FlexAdapt_EMG_Dataset).
