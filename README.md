@@ -16,3 +16,17 @@
   - [Meta-Learning](#step2)
   - [Knowledge-Distillation](#step3)
 - [On-device AdaptiveEdge](#online)
+
+
+
+# Usage
+
+<h2 id="installation">🛠 Installation</h2>
+
+1. Clone the repo:
+   ```bash
+   git clone https://github.com/deremustapha/AdpativeEdge
+
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
