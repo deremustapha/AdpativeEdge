@@ -61,3 +61,9 @@ During the offline pre-training, it is important that the model weights are save
 
 <h2 id="online"> On-device AdaptiveEdge Model Update</h2>
 
+Typically, the pre-trained models need to be depolyed on an Ultra96-V2 FPGA for inference. However, a fine-tune script is provided to allow the replication of the AdaptiveEdge and other model update methods on local computer. 
+
+4. [AdaptiveEdge](#step):
+   ```bash
+   fine-tune.py
+
