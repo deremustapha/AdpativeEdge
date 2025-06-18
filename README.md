@@ -21,7 +21,7 @@
 
 # Usage
 
-<h2 id="installation">🛠 Installation</h2>
+<h2 id="installation">🛠 [Installation and Setup</h2>
 
 1. Clone the repo:
    ```bash
